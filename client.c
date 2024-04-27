@@ -121,7 +121,8 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
 }
 
 int main(int argc, char *argv[]) {
-    int sock = 0;
+    int sock = 0, valread;
+    struct sockaddr_in server_addr;
     char buffer[BUFFER_SIZE] = {0};
     int connected_to_channel = 0;
 
@@ -150,7 +151,7 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        for (size_t i = 0; i < strlen(buffer); ++i) {
+        for (int i = 0; i < strlen(buffer); ++i) {
             if (buffer[i] == '\n') {
                 buffer[i] = '\0';
             }
@@ -159,7 +160,7 @@ int main(int argc, char *argv[]) {
         send(sock, buffer, strlen(buffer), 0);
         memset(buffer, 0, sizeof(buffer));
 
-        read(sock, buffer, BUFFER_SIZE);
+        valread = read(sock, buffer, BUFFER_SIZE);
         printf("Server: %s\n", buffer);
     }
 }

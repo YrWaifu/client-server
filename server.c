@@ -146,6 +146,22 @@ int process_command(char *cmd, int server_fd, struct Client *clients, struct soc
     return 0;
 }
 
+void log_message(char *channel_name, char *client_channel, char *client_nickname,
+                 struct sockaddr_in client_address, char *buffer) {
+    char log_filename[100];
+    sprintf(log_filename, "./logs/%s.log", channel_name);
+    FILE *log_file = fopen(log_filename, "a");
+
+    if (log_file == NULL) {
+        perror("Error opening log file");
+    }
+
+    fprintf(log_file, "%s (%s:%d): %s\n", client_nickname, inet_ntoa(client_address.sin_addr),
+            ntohs(client_address.sin_port), buffer);
+
+    fclose(log_file);
+}
+
 int receive_message(int sd, char *buffer, struct Client *clients, int server_paused, Channel *channels,
                     int num_channels) {
     struct sockaddr_in client_address;
@@ -220,6 +236,7 @@ int receive_message(int sd, char *buffer, struct Client *clients, int server_pau
             } else {
                 // Echo received message back to client
                 getpeername(sd, (struct sockaddr *)&client_address, (socklen_t *)&client_addrlen);
+
                 char *client_nickname = get_client_nickname(sd, clients);
                 char *client_channel = "Unknown";
                 for (int i = 0; i < MAX_CLIENTS; i++) {
@@ -228,8 +245,12 @@ int receive_message(int sd, char *buffer, struct Client *clients, int server_pau
                         break;
                     }
                 }
+
                 printf("%s -> %s (%s:%d): %s\n", client_channel, client_nickname,
                        inet_ntoa(client_address.sin_addr), ntohs(client_address.sin_port), buffer);
+
+                log_message(client_channel, client_channel, client_nickname, client_address, buffer);
+
                 send(sd, "success\0", strlen("success\0"), 0);
             }
         } else {
@@ -309,6 +330,17 @@ void add_channel(Channel *channels, char *channel_name, char *comment, int *num_
 
     (*num_channels)++;
 
+    char log_filename[100];
+    sprintf(log_filename, "./logs/%s.log", channel_name);
+    FILE *log_file = fopen(log_filename, "w");
+
+    if (log_file == NULL) {
+        perror("Error creating log file");
+        exit(EXIT_FAILURE);
+    }
+
+    fclose(log_file);
+
     FILE *file = fopen("channels.txt", "a");
     if (file == NULL) {
         perror("Error opening file");
@@ -345,8 +377,17 @@ void add_client_to_channel(Channel channels[], int num_channels, Client *client,
     }
 }
 
+char *get_client_channel(int socket, struct Client *clients) {
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (clients[i].socket == socket) {
+            return clients[i].channel;
+        }
+    }
+    return "Unknown";
+}
+
 int main(int argc, char *argv[]) {
-    int server_fd;
+    int server_fd, new_socket, valread;
     struct sockaddr_in address;
     int addrlen = sizeof(address);
     char buffer[BUFFER_SIZE] = {0};

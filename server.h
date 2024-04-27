@@ -52,6 +52,9 @@ void read_channels_from_file(Channel *channels, int *num_channels);
 void add_channel(Channel *channels, char *channel_name, char *comment, int *num_channels);
 void print_channels(Channel *channels, int num_channels);
 int channel_exists(Channel channels[], int num_channels, char *channel_name);
+char *get_client_channel(int socket, struct Client *clients);
 void add_client_to_channel(Channel channels[], int num_channels, Client *client, char *channel_name);
+void log_message(char *channel_name, char *client_channel, char *client_nickname,
+                 struct sockaddr_in client_address, char *buffer);
 
 int main(int argc, char *argv[]);
