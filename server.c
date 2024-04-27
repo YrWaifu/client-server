@@ -346,7 +346,7 @@ void add_client_to_channel(Channel channels[], int num_channels, Client *client,
 }
 
 int main(int argc, char *argv[]) {
-    int server_fd, new_socket, valread;
+    int server_fd;
     struct sockaddr_in address;
     int addrlen = sizeof(address);
     char buffer[BUFFER_SIZE] = {0};
