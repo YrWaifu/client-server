@@ -16,6 +16,7 @@
 #define MAX_CHANNEL_NAME_LENGTH 30
 #define MAX_COMMENT_LENGTH 1024
 #define MAX_CHANNEL_CLIENTS 15
+#define COMMAND_LEN 1024
 
 #define SO_REUSEPORT 15
 
@@ -57,5 +58,7 @@ char *get_client_channel(int socket, struct Client *clients);
 void add_client_to_channel(Channel channels[], int num_channels, Client *client, char *channel_name);
 void log_message(char *channel_name, char *client_channel, char *client_nickname,
                  struct sockaddr_in client_address, char *buffer);
+void del_channel(Channel *channels, int *num_channels, char *channel_name);
+void set_channel(Channel *channels, int num_channels, char *channel_name, char *new_comment);
 
 int main(int argc, char *argv[]);

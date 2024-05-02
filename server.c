@@ -11,6 +11,10 @@ void print_help(char *argv[]) {
     printf("  resume\tTo resume server\n");
     printf("  change {PORT}\tTo change port\n");
     printf("  status\tTo get status of the server\n");
+    printf("  add_channel {NAME} \"{COMMENT}\"\tTo add new channel\n");
+    printf("  add_channel {NAME} \"{COMMENT}\"\tChange existing channel\n");
+    printf("  del_channel {NAME}\tTo delete channel\n");
+    printf("  info {NAME}\tTo take info about channel\n");
     exit(EXIT_SUCCESS);
 }
 
@@ -152,15 +156,99 @@ int process_command(char *cmd, int server_fd, struct Client *clients, struct soc
 
         return 1;
     } else if (strncmp(cmd, "/add_channel ", 13) == 0) {
-        char channel_name[MAX_CHANNEL_NAME_LENGTH];
-        char comment[MAX_COMMENT_LENGTH];
-        if (sscanf(cmd + 13, "%s %s", channel_name, comment) != 2) {
-            printf("%s  %s  Usage: /add_channel <name> <comment>\n", channel_name, comment);
+        char *channel_start = cmd + 13;
 
+        char *channel_end = strchr(channel_start, ' ');
+        if (channel_end == NULL) {
+            printf("Invalid command format: channel name is missing\n");
             return 1;
         }
 
+        char *comment_start = strchr(channel_end, '\"');
+        if (comment_start == NULL) {
+            printf("Invalid command format: comment is missing\n");
+            return 1;
+        }
+
+        char *comment_end = strchr(comment_start + 1, '\"');
+        if (comment_end == NULL) {
+            printf("Invalid command format: closing quote for comment is missing\n");
+            return 1;
+        }
+
+        char channel_name[MAX_CHANNEL_NAME_LENGTH];
+        int channel_name_length = channel_end - channel_start;
+        if (channel_name_length >= MAX_CHANNEL_NAME_LENGTH) {
+            printf("Channel name is too long\n");
+            return 1;
+        }
+        strncpy(channel_name, channel_start, channel_name_length);
+        channel_name[channel_name_length] = '\0';
+
+        char comment[MAX_COMMENT_LENGTH];
+        int comment_length = comment_end - comment_start - 1;
+        if (comment_length >= MAX_COMMENT_LENGTH) {
+            printf("Comment is too long\n");
+            return 1;
+        }
+        strncpy(comment, comment_start + 1, comment_length);
+        comment[comment_length] = '\0';
+
         add_channel(channels, channel_name, comment, &num_channels);
+
+        return 1;
+    } else if (strncmp(cmd, "/del_channel ", 13) == 0) {
+        char channel_name[MAX_CHANNEL_NAME_LENGTH];
+        strcpy(channel_name, cmd + 13);
+        char *pos;
+
+        if ((pos = strchr(channel_name, '\n')) != NULL) {
+            *pos = '\0';
+        }
+
+        del_channel(channels, &num_channels, channel_name);
+
+        return 1;
+    } else if (strncmp(cmd, "/set_channel ", 13) == 0) {
+        char *channel_start = cmd + 13;
+
+        char *channel_end = strchr(channel_start, ' ');
+        if (channel_end == NULL) {
+            printf("Invalid command format: channel name is missing\n");
+            return 1;
+        }
+
+        char *comment_start = strchr(channel_end, '\"');
+        if (comment_start == NULL) {
+            printf("Invalid command format: comment is missing\n");
+            return 1;
+        }
+
+        char *comment_end = strchr(comment_start + 1, '\"');
+        if (comment_end == NULL) {
+            printf("Invalid command format: closing quote for comment is missing\n");
+            return 1;
+        }
+
+        char channel_name[MAX_CHANNEL_NAME_LENGTH];
+        int channel_name_length = channel_end - channel_start;
+        if (channel_name_length >= MAX_CHANNEL_NAME_LENGTH) {
+            printf("Channel name is too long\n");
+            return 1;
+        }
+        strncpy(channel_name, channel_start, channel_name_length);
+        channel_name[channel_name_length] = '\0';
+
+        char new_comment[MAX_COMMENT_LENGTH];
+        int comment_length = comment_end - comment_start - 1;
+        if (comment_length >= MAX_COMMENT_LENGTH) {
+            printf("Comment is too long\n");
+            return 1;
+        }
+        strncpy(new_comment, comment_start + 1, comment_length);
+        new_comment[comment_length] = '\0';
+
+        set_channel(channels, num_channels, channel_name, new_comment);
 
         return 1;
     } else {
@@ -169,6 +257,79 @@ int process_command(char *cmd, int server_fd, struct Client *clients, struct soc
         return 1;
     }
     return 0;
+}
+
+void set_channel(Channel *channels, int num_channels, char *channel_name, char *new_comment) {
+    int found = 0;
+
+    for (int i = 0; i < num_channels; i++) {
+        if (strcmp(channels[i].channel, channel_name) == 0) {
+            found = 1;
+            strcpy(channels[i].comment, new_comment);
+            break;
+        }
+    }
+
+    if (found) {
+        FILE *file = fopen("channels.txt", "w");
+        if (file == NULL) {
+            perror("Error opening file");
+            exit(EXIT_FAILURE);
+        }
+
+        for (int i = 0; i < num_channels; i++) {
+            fprintf(file, "%s %s\n", channels[i].channel, channels[i].comment);
+        }
+
+        fclose(file);
+
+        printf("Comment for channel '%s' successfully updated\n", channel_name);
+    } else {
+        printf("Channel '%s' not found\n", channel_name);
+    }
+}
+
+void del_channel(Channel *channels, int *num_channels, char *channel_name) {
+    int found = 0;
+    int index = -1;
+
+    for (int i = 0; i < *num_channels; i++) {
+        if (strcmp(channels[i].channel, channel_name) == 0) {
+            found = 1;
+            index = i;
+            break;
+        }
+    }
+
+    if (found) {
+        for (int i = index; i < *num_channels - 1; i++) {
+            strcpy(channels[i].channel, channels[i + 1].channel);
+            strcpy(channels[i].comment, channels[i + 1].comment);
+            channels[i].num_clients = channels[i + 1].num_clients;
+        }
+
+        (*num_channels)--;
+
+        FILE *file = fopen("channels.txt", "w");
+        if (file == NULL) {
+            perror("Error opening file");
+            exit(EXIT_FAILURE);
+        }
+
+        for (int i = 0; i < *num_channels; i++) {
+            fprintf(file, "%s %s\n", channels[i].channel, channels[i].comment);
+        }
+
+        fclose(file);
+
+        char buffer[MAX_CHANNEL_NAME_LENGTH + 11];
+        sprintf(buffer, "./logs/%s.log", channel_name);
+        remove(buffer);
+
+        printf("Channel '%s' successfully deleted\n", channel_name);
+    } else {
+        printf("Channel '%s' not found\n", channel_name);
+    }
 }
 
 void print_channel_info(char *channel_name, Channel *channels, int num_channels, struct Client *clients) {
@@ -487,7 +648,7 @@ int main(int argc, char *argv[]) {
 
         // stdin input
         if (FD_ISSET(STDIN_FILENO, &readfds)) {
-            char cmd[20];
+            char cmd[COMMAND_LEN];
 
             if (fgets(cmd, sizeof(cmd), stdin) != NULL) {
                 cmd[strcspn(cmd, "\n")] = 0;
