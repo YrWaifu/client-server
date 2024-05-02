@@ -77,7 +77,7 @@ char *get_client_nickname(int socket, struct Client *clients) {
 }
 
 int process_command(char *cmd, int server_fd, struct Client *clients, struct sockaddr_in *address, int *port,
-                    int *server_paused) {
+                    int *server_paused, Channel *channels, int num_channels) {
     if (strcmp(cmd, "/stop") == 0 || strcmp(cmd, "/exit") == 0) {
         printf("Stopping the server...\n");
         close(server_fd);
@@ -139,11 +139,61 @@ int process_command(char *cmd, int server_fd, struct Client *clients, struct soc
         }
         printf("Number of connected clients: %d\n", connected_clients);
         return 1;
+    } else if (strncmp(cmd, "/info ", 6) == 0) {
+        char channel_name[MAX_CHANNEL_NAME_LENGTH];
+        strcpy(channel_name, cmd + 6);
+        char *pos;
+
+        if ((pos = strchr(channel_name, '\n')) != NULL) {
+            *pos = '\0';
+        }
+
+        print_channel_info(channel_name, channels, num_channels, clients);
+
+        return 1;
+    } else if (strncmp(cmd, "/add_channel ", 13) == 0) {
+        char channel_name[MAX_CHANNEL_NAME_LENGTH];
+        char comment[MAX_COMMENT_LENGTH];
+        if (sscanf(cmd + 13, "%s %s", channel_name, comment) != 2) {
+            printf("%s  %s  Usage: /add_channel <name> <comment>\n", channel_name, comment);
+
+            return 1;
+        }
+
+        add_channel(channels, channel_name, comment, &num_channels);
+
+        return 1;
     } else {
         printf("Wrong command\n");
+
         return 1;
     }
     return 0;
+}
+
+void print_channel_info(char *channel_name, Channel *channels, int num_channels, struct Client *clients) {
+    for (int i = 0; i < num_channels; ++i) {
+        if (strcmp(channels[i].channel, channel_name) == 0) {
+            printf("Channel: %s\n", channels[i].channel);
+            printf("Comment: %s\n", channels[i].comment);
+            printf("Connected clients:\n");
+
+            for (int j = 0; j < channels[i].num_clients; ++j) {
+                int client_socket = channels[i].clients[j].socket;
+                struct sockaddr_in client_addr;
+                socklen_t addr_len = sizeof(client_addr);
+                getpeername(client_socket, (struct sockaddr *)&client_addr, &addr_len);
+                char client_ip[INET_ADDRSTRLEN];
+                inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, INET_ADDRSTRLEN);
+                int client_port = ntohs(client_addr.sin_port);
+
+                printf("  - %s (%s:%d)\n", channels[i].clients[j].nickname, client_ip, client_port);
+            }
+
+            return;
+        }
+    }
+    printf("Channel '%s' not found\n", channel_name);
 }
 
 void log_message(char *channel_name, char *client_channel, char *client_nickname,
@@ -368,7 +418,6 @@ void add_client_to_channel(Channel channels[], int num_channels, Client *client,
             if (channels[i].num_clients < MAX_CHANNEL_CLIENTS) {
                 strcpy(channels[i].clients[channels[i].num_clients].nickname, client->nickname);
                 channels[i].num_clients++;
-                printf("Client '%s' added to channel '%s'.\n", client->nickname, channel_name);
                 return;
             } else {
                 return;
@@ -443,7 +492,8 @@ int main(int argc, char *argv[]) {
             if (fgets(cmd, sizeof(cmd), stdin) != NULL) {
                 cmd[strcspn(cmd, "\n")] = 0;
 
-                if (process_command(cmd, server_fd, clients, &address, &port, &server_paused)) {
+                if (process_command(cmd, server_fd, clients, &address, &port, &server_paused, channels,
+                                    num_channels)) {
                     continue;
                 }
             }
