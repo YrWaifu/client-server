@@ -22,6 +22,9 @@
 
 #define NICKNAME_SIZE 32
 
+#define MAX_LOG_LINES 10
+#define MAX_LOG_LINE_LENGTH 256
+
 struct Client;
 struct Channel;
 
@@ -60,5 +63,6 @@ void log_message(char *channel_name, char *client_channel, char *client_nickname
                  struct sockaddr_in client_address, char *buffer);
 void del_channel(Channel *channels, int *num_channels, char *channel_name);
 void set_channel(Channel *channels, int num_channels, char *channel_name, char *new_comment);
+void send_last_channel_messages(int sd, char *channel_name);
 
 int main(int argc, char *argv[]);

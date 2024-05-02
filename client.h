@@ -8,6 +8,8 @@
 #include <unistd.h>
 
 #define BUFFER_SIZE 2048
+#define MAX_LOG_LINES 10
+#define MAX_LOG_LINE_LENGTH 256
 
 void print_help(char *argv[]);
 void parse_arguments(int argc, char *argv[], int *port, char **ip);

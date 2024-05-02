@@ -444,6 +444,16 @@ int receive_message(int sd, char *buffer, struct Client *clients, int server_pau
                         break;
                     }
                 }
+            } else if (strcmp(buffer, "/read") == 0) {
+                char *client_channel = get_client_channel(sd, clients);
+
+                if (strcmp(client_channel, "Unknown") == 0) {
+                    send(sd, "You are not connected to any channel\0",
+                         strlen("You are not connected to any channel\0"), 0);
+                } else {
+                    send_last_channel_messages(sd, client_channel);
+                }
+                return 1;
             } else {
                 // Echo received message back to client
                 getpeername(sd, (struct sockaddr *)&client_address, (socklen_t *)&client_addrlen);
@@ -469,6 +479,33 @@ int receive_message(int sd, char *buffer, struct Client *clients, int server_pau
         }
     }
     return 0;
+}
+
+void send_last_channel_messages(int sd, char *channel_name) {
+    char log_filename[256];
+    FILE *log_file;
+    char buffer[MAX_LOG_LINES][MAX_LOG_LINE_LENGTH];
+    int lines_count = 0;
+
+    sprintf(log_filename, "./logs/%s.log", channel_name);
+
+    log_file = fopen(log_filename, "r");
+    if (log_file == NULL) {
+        perror("Error opening log file");
+        return;
+    }
+
+    while (fgets(buffer[lines_count % MAX_LOG_LINES], MAX_LOG_LINE_LENGTH, log_file) != NULL) {
+        lines_count++;
+    }
+
+    int start_line = lines_count > MAX_LOG_LINES ? lines_count % MAX_LOG_LINES : 0;
+
+    for (int i = start_line; i < lines_count; i++) {
+        send(sd, buffer[i % MAX_LOG_LINES], strlen(buffer[i % MAX_LOG_LINES]), 0);
+    }
+
+    fclose(log_file);
 }
 
 int channel_exists(Channel channels[], int num_channels, char *channel_name) {
