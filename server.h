@@ -47,7 +47,7 @@ void parse_arguments(int argc, char *argv[], int *port);
 void setup_server(int *server_fd, int port, struct Client *clients, struct sockaddr_in *address);
 char *get_client_nickname(int socket, struct Client *clients);
 int process_command(char *cmd, int server_fd, struct Client *clients, struct sockaddr_in *address, int *port,
-                    int *server_paused, Channel *channels, int num_channels);
+                    int *server_paused, Channel *channels, int *num_channels);
 int receive_message(int sd, char *buffer, struct Client *clients, int server_paused, Channel *channels,
                     int num_channels);
 void handle_new_connection(int server_fd, struct sockaddr_in *address, int *addrlen, struct Client *clients);

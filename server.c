@@ -15,6 +15,7 @@ void print_help() {
     printf("  /add_channel {NAME} \"{COMMENT}\"\tChange existing channel\n");
     printf("  /del_channel {NAME}\tTo delete channel\n");
     printf("  /info {NAME}\tTo take info about channel\n");
+    printf("  /channels\tList of channels\n");
     exit(EXIT_SUCCESS);
 }
 
@@ -81,7 +82,7 @@ char *get_client_nickname(int socket, struct Client *clients) {
 }
 
 int process_command(char *cmd, int server_fd, struct Client *clients, struct sockaddr_in *address, int *port,
-                    int *server_paused, Channel *channels, int num_channels) {
+                    int *server_paused, Channel *channels, int *num_channels) {
     if (strcmp(cmd, "/stop") == 0 || strcmp(cmd, "/exit") == 0) {
         printf("Stopping the server...\n");
         close(server_fd);
@@ -152,7 +153,7 @@ int process_command(char *cmd, int server_fd, struct Client *clients, struct soc
             *pos = '\0';
         }
 
-        print_channel_info(channel_name, channels, num_channels, clients);
+        print_channel_info(channel_name, channels, *num_channels, clients);
 
         return 1;
     } else if (strncmp(cmd, "/add_channel ", 13) == 0) {
@@ -194,7 +195,7 @@ int process_command(char *cmd, int server_fd, struct Client *clients, struct soc
         strncpy(comment, comment_start + 1, comment_length);
         comment[comment_length] = '\0';
 
-        add_channel(channels, channel_name, comment, &num_channels);
+        add_channel(channels, channel_name, comment, num_channels);
 
         return 1;
     } else if (strncmp(cmd, "/del_channel ", 13) == 0) {
@@ -206,7 +207,7 @@ int process_command(char *cmd, int server_fd, struct Client *clients, struct soc
             *pos = '\0';
         }
 
-        del_channel(channels, &num_channels, channel_name);
+        del_channel(channels, num_channels, channel_name);
 
         return 1;
     } else if (strncmp(cmd, "/set_channel ", 13) == 0) {
@@ -248,11 +249,15 @@ int process_command(char *cmd, int server_fd, struct Client *clients, struct soc
         strncpy(new_comment, comment_start + 1, comment_length);
         new_comment[comment_length] = '\0';
 
-        set_channel(channels, num_channels, channel_name, new_comment);
+        set_channel(channels, *num_channels, channel_name, new_comment);
 
         return 1;
     } else if (strcmp(cmd, "/help") == 0) {
         print_help();
+        return 1;
+    } else if (strcmp(cmd, "/channels") == 0) {
+        print_channels(channels, *num_channels);
+        return 1;
     } else {
         printf("Wrong command\n");
 
@@ -693,7 +698,7 @@ int main(int argc, char *argv[]) {
                 cmd[strcspn(cmd, "\n")] = 0;
 
                 if (process_command(cmd, server_fd, clients, &address, &port, &server_paused, channels,
-                                    num_channels)) {
+                                    &num_channels)) {
                     continue;
                 }
             }
