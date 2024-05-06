@@ -461,6 +461,15 @@ int receive_message(int sd, char *buffer, struct Client *clients, int server_pau
                     send_last_channel_messages(sd, client_channel);
                 }
                 return 1;
+            } else if (strcmp(buffer, "/channels") == 0) {
+                char response[BUFFER_SIZE];
+                snprintf(response, sizeof(response), "%d", num_channels);
+
+                if (send(sd, response, strlen(response), 0) < 0) {
+                    perror("send");
+                    return -1;
+                }
+                return 1;
             } else {
                 // Echo received message back to client
                 getpeername(sd, (struct sockaddr *)&client_address, (socklen_t *)&client_addrlen);

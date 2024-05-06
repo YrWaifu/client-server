@@ -157,6 +157,24 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
             }
 
             return 1;
+        } else if (strcmp(buffer, "/channels")) {
+            if (send(sock, buffer, strlen(buffer), 0) < 0) {
+                perror("send");
+                return -1;
+            }
+
+            // Получаем ответ от сервера
+            char response[BUFFER_SIZE];
+            memset(response, 0, sizeof(response));
+            if (recv(sock, response, sizeof(response), 0) < 0) {
+                perror("recv");
+                return -1;
+            }
+
+            // Выводим количество каналов на экран
+            printf("Number of channels: %s", response);
+
+            return 1;
         }
     }
     return 0;
