@@ -42,7 +42,7 @@ typedef struct Channel {
     int num_clients;
 } Channel;
 
-void print_help(char *argv[]);
+void print_help();
 void parse_arguments(int argc, char *argv[], int *port);
 void setup_server(int *server_fd, int port, struct Client *clients, struct sockaddr_in *address);
 char *get_client_nickname(int socket, struct Client *clients);

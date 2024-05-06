@@ -10,6 +10,7 @@ void print_help(char *argv[]) {
     printf("  /exit\t\tTo disconnect from server\n");
     printf("  /nick {NICK}\tTo enter your nickname\n");
     printf("  /join {CHANNEL} To join to channel\n");
+    printf("  /read\t To read last 10 messages from channel\n");
     exit(EXIT_SUCCESS);
 }
 
@@ -69,7 +70,8 @@ int connect_to_server(char *ip, int port) {
     return sock;
 }
 
-int process_command(char *buffer, int sock, char *ip, int port, int *connected_to_channel) {
+int process_command(char *buffer, int sock, char *ip, int port, int *connected_to_channel,
+                    char channel_name[MAX_CHANNEL_NAME_LENGTH], char nickname[NICKNAME_SIZE]) {
     if (buffer[0] == '/') {
         if (strcmp(buffer, "/exit\n") == 0) {
             printf("Disconnecting from server...\n");
@@ -77,7 +79,17 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
             exit(EXIT_SUCCESS);
         } else if (strncmp(buffer, "/nick", 5) == 0) {
             send(sock, buffer, strlen(buffer), 0);
+
+            char name[NICKNAME_SIZE];
+            strcpy(name, buffer + 6);
+            char *pos;
+            if ((pos = strchr(name, '\n')) != NULL) {
+                *pos = '\0';
+            }
+            strncpy(nickname, name, NICKNAME_SIZE);
+
             memset(buffer, 0, BUFFER_SIZE);
+
             if (recv(sock, buffer, BUFFER_SIZE, 0) == -1) {
                 perror("recv");
                 exit(EXIT_FAILURE);
@@ -106,18 +118,34 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
             return 1;
         } else if (strncmp(buffer, "/join", 5) == 0) {
             send(sock, buffer, strlen(buffer), 0);
+
+            char name[MAX_CHANNEL_NAME_LENGTH];
+            strcpy(name, buffer + 6);
+            char *pos;
+            if ((pos = strchr(name, '\n')) != NULL) {
+                *pos = '\0';
+            }
+            strncpy(channel_name, name, MAX_CHANNEL_NAME_LENGTH);
+
             memset(buffer, 0, BUFFER_SIZE);
             if (recv(sock, buffer, BUFFER_SIZE, 0) == -1) {
                 perror("recv");
                 exit(EXIT_FAILURE);
             }
             printf("Server: %s\n", buffer);
-            *connected_to_channel = 1;
+
+            if (strcmp(buffer, "unknown channel") == 0) {
+                *connected_to_channel = 0;
+                strncpy(channel_name, "Unknown", MAX_CHANNEL_NAME_LENGTH);
+                channel_name[MAX_CHANNEL_NAME_LENGTH - 1] = '\0';
+            } else {
+                *connected_to_channel = 1;
+            }
 
             return 1;
         } else if (strcmp(buffer, "/read") == 0) {
-            for (int i = 0; i < 10; i++) {
-                char message[MAX_LOG_LINE_LENGTH];
+            for (int i = 0; i < MAX_LOG_LINES; i++) {
+                char message[MAX_LOG_LINE_LENGTH] = {""};
                 int valread = recv(sock, message, MAX_LOG_LINE_LENGTH, 0);
                 if (valread > 0) {
                     message[valread] = '\0';
@@ -127,6 +155,8 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
                     break;
                 }
             }
+
+            return 1;
         }
     }
     return 0;
@@ -137,6 +167,8 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in server_addr;
     char buffer[BUFFER_SIZE] = {0};
     int connected_to_channel = 0;
+    char channel_name[MAX_CHANNEL_NAME_LENGTH] = "Unknown";
+    char nickname[NICKNAME_SIZE] = "Unknown";
 
     int port = 0;
     char *ip = NULL;
@@ -146,13 +178,13 @@ int main(int argc, char *argv[]) {
     sock = connect_to_server(ip, port);
 
     while (1) {
-        printf("Enter message: ");
+        printf("%s@%s::", nickname, channel_name);
         memset(buffer, 0, sizeof(buffer));
         fgets(buffer, BUFFER_SIZE, stdin);
 
         // processing commands
         if (buffer[0] == '/') {
-            if (process_command(buffer, sock, ip, port, &connected_to_channel)) {
+            if (process_command(buffer, sock, ip, port, &connected_to_channel, channel_name, nickname)) {
                 continue;
             }
         }

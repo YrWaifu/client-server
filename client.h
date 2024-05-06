@@ -10,10 +10,13 @@
 #define BUFFER_SIZE 2048
 #define MAX_LOG_LINES 10
 #define MAX_LOG_LINE_LENGTH 256
+#define MAX_CHANNEL_NAME_LENGTH 30
+#define NICKNAME_SIZE 32
 
 void print_help(char *argv[]);
 void parse_arguments(int argc, char *argv[], int *port, char **ip);
 int connect_to_server(char *ip, int port);
-int process_command(char *buffer, int sock, char *ip, int port, int *connected_to_channel);
+int process_command(char *buffer, int sock, char *ip, int port, int *connected_to_channel,
+                    char channel_name[MAX_CHANNEL_NAME_LENGTH], char nickname[NICKNAME_SIZE]);
 
 int main(int argc, char *argv[]);

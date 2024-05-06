@@ -1,20 +1,20 @@
 #include "server.h"
 
-void print_help(char *argv[]) {
-    printf("Usage: %s -p {port}\n", argv[0]);
+void print_help() {
+    printf("Usage: ./server -p {port}\n");
     printf("Options:\n");
     printf("  -p/--port {port}\tSpecifies the port number (default is 8080)\n");
     printf("  -h/--help\t\tDisplay this help message\n");
     printf("Commands:\n");
-    printf("  stop\t\tTo stop server\n");
-    printf("  pause\t\tTo pause server\n");
-    printf("  resume\tTo resume server\n");
-    printf("  change {PORT}\tTo change port\n");
-    printf("  status\tTo get status of the server\n");
-    printf("  add_channel {NAME} \"{COMMENT}\"\tTo add new channel\n");
-    printf("  add_channel {NAME} \"{COMMENT}\"\tChange existing channel\n");
-    printf("  del_channel {NAME}\tTo delete channel\n");
-    printf("  info {NAME}\tTo take info about channel\n");
+    printf("  /stop\t\tTo stop server\n");
+    printf("  /pause\t\tTo pause server\n");
+    printf("  /resume\tTo resume server\n");
+    printf("  /change {PORT}\tTo change port\n");
+    printf("  /status\tTo get status of the server\n");
+    printf("  /add_channel {NAME} \"{COMMENT}\"\tTo add new channel\n");
+    printf("  /add_channel {NAME} \"{COMMENT}\"\tChange existing channel\n");
+    printf("  /del_channel {NAME}\tTo delete channel\n");
+    printf("  /info {NAME}\tTo take info about channel\n");
     exit(EXIT_SUCCESS);
 }
 
@@ -30,7 +30,7 @@ void parse_arguments(int argc, char *argv[], int *port) {
                 *port = atoi(optarg);
                 break;
             case 'h':
-                print_help(argv);
+                print_help();
                 break;
             default:
                 fprintf(stderr, "Usage: %s -p {port}\n", argv[0]);
@@ -251,6 +251,8 @@ int process_command(char *cmd, int server_fd, struct Client *clients, struct soc
         set_channel(channels, num_channels, channel_name, new_comment);
 
         return 1;
+    } else if (strcmp(cmd, "/help") == 0) {
+        print_help();
     } else {
         printf("Wrong command\n");
 
