@@ -94,7 +94,11 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
                 perror("recv");
                 exit(EXIT_FAILURE);
             }
-            printf("Server: %s\n", buffer);
+            // time
+            char time_str[20];
+            format_time(time_str);
+
+            printf("[%s] Server: %s\n", time_str, buffer);
 
             return 1;
         } else if (strcmp(buffer, "/status\n") == 0) {
@@ -132,7 +136,11 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
                 perror("recv");
                 exit(EXIT_FAILURE);
             }
-            printf("Server: %s\n", buffer);
+            // time
+            char time_str[20];
+            format_time(time_str);
+
+            printf("[%s] Server: %s\n", time_str, buffer);
 
             if (strcmp(buffer, "unknown channel") == 0) {
                 *connected_to_channel = 0;
@@ -223,6 +231,11 @@ int main(int argc, char *argv[]) {
         memset(buffer, 0, sizeof(buffer));
 
         valread = read(sock, buffer, BUFFER_SIZE);
-        printf("Server: %s\n", buffer);
+
+        // time
+        char time_str[20];
+        format_time(time_str);
+
+        printf("[%s] Server: %s\n", time_str, buffer);
     }
 }

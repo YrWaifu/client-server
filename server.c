@@ -375,12 +375,8 @@ void log_message(char *channel_name, char *client_channel, char *client_nickname
     }
 
     // time
-    time_t rawtime;
-    struct tm *timeinfo;
-    time(&rawtime);
-    timeinfo = localtime(&rawtime);
-    char *time_str = asctime(timeinfo);
-    time_str[strlen(time_str) - 1] = '\0';
+    char time_str[20];
+    format_time(time_str);
 
     // hash
     unsigned char hash[SHA_DIGEST_LENGTH];
@@ -499,7 +495,11 @@ int receive_message(int sd, char *buffer, struct Client *clients, int server_pau
                     }
                 }
 
-                printf("%s -> %s (%s:%d): %s\n", client_channel, client_nickname,
+                // time
+                char time_str[20];
+                format_time(time_str);
+
+                printf("[%s] %s -> %s (%s:%d): %s\n", time_str, client_channel, client_nickname,
                        inet_ntoa(client_address.sin_addr), ntohs(client_address.sin_port), buffer);
 
                 log_message(client_channel, client_channel, client_nickname, client_address, buffer);

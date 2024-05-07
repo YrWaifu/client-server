@@ -8,8 +8,9 @@
 #include <string.h>
 #include <sys/select.h>
 #include <sys/socket.h>
-#include <time.h>
 #include <unistd.h>
+
+#include "helper.h"
 
 #define PORT 8080
 #define MAX_CLIENTS 10

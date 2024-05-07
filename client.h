@@ -7,6 +7,8 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include "helper.h"
+
 #define BUFFER_SIZE 2048
 #define MAX_LOG_LINES 10
 #define MAX_LOG_LINE_LENGTH 256
