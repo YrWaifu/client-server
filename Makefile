@@ -16,4 +16,4 @@ helper.o: helper.c
 rebuild: clean all
 
 clean:
-	r	m -rf server client helper.o
+	rm -rf server client helper.o

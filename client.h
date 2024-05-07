@@ -19,6 +19,6 @@ void print_help(char *argv[]);
 void parse_arguments(int argc, char *argv[], int *port, char **ip);
 int connect_to_server(char *ip, int port);
 int process_command(char *buffer, int sock, char *ip, int port, int *connected_to_channel,
-                    char channel_name[MAX_CHANNEL_NAME_LENGTH], char nickname[NICKNAME_SIZE]);
+                    char channel_name[MAX_CHANNEL_NAME_LENGTH], char nickname[NICKNAME_SIZE], int *time_on);
 
 int main(int argc, char *argv[]);

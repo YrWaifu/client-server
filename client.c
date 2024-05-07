@@ -10,7 +10,8 @@ void print_help(char *argv[]) {
     printf("  /exit\t\tTo disconnect from server\n");
     printf("  /nick {NICK}\tTo enter your nickname\n");
     printf("  /join {CHANNEL} To join to channel\n");
-    printf("  /read\t To read last 10 messages from channel\n");
+    printf("  /read\tTo read last 10 messages from channel\n");
+    printf("  /time\tTo switch on/off time\n ");
     exit(EXIT_SUCCESS);
 }
 
@@ -71,7 +72,7 @@ int connect_to_server(char *ip, int port) {
 }
 
 int process_command(char *buffer, int sock, char *ip, int port, int *connected_to_channel,
-                    char channel_name[MAX_CHANNEL_NAME_LENGTH], char nickname[NICKNAME_SIZE]) {
+                    char channel_name[MAX_CHANNEL_NAME_LENGTH], char nickname[NICKNAME_SIZE], int *time_on) {
     if (buffer[0] == '/') {
         if (strcmp(buffer, "/exit\n") == 0) {
             printf("Disconnecting from server...\n");
@@ -94,11 +95,15 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
                 perror("recv");
                 exit(EXIT_FAILURE);
             }
-            // time
-            char time_str[20];
-            format_time(time_str);
+            if (*time_on) {
+                // time
+                char time_str[20];
+                format_time(time_str);
 
-            printf("[%s] Server: %s\n", time_str, buffer);
+                printf("[%s] Server: %s\n", time_str, buffer);
+            } else {
+                printf("Server: %s\n", buffer);
+            }
 
             return 1;
         } else if (strcmp(buffer, "/status\n") == 0) {
@@ -136,11 +141,15 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
                 perror("recv");
                 exit(EXIT_FAILURE);
             }
-            // time
-            char time_str[20];
-            format_time(time_str);
+            if (*time_on) {
+                // time
+                char time_str[20];
+                format_time(time_str);
 
-            printf("[%s] Server: %s\n", time_str, buffer);
+                printf("[%s] Server: %s\n", time_str, buffer);
+            } else {
+                printf("Server: %s\n", buffer);
+            }
 
             if (strcmp(buffer, "unknown channel") == 0) {
                 *connected_to_channel = 0;
@@ -151,7 +160,7 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
             }
 
             return 1;
-        } else if (strcmp(buffer, "/read") == 0) {
+        } else if (strcmp(buffer, "/read\n") == 0) {
             for (int i = 0; i < MAX_LOG_LINES; i++) {
                 char message[MAX_LOG_LINE_LENGTH] = {""};
                 int valread = recv(sock, message, MAX_LOG_LINE_LENGTH, 0);
@@ -165,7 +174,7 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
             }
 
             return 1;
-        } else if (strcmp(buffer, "/channels")) {
+        } else if (strcmp(buffer, "/channels\n") == 0) {
             if (send(sock, buffer, strlen(buffer), 0) < 0) {
                 perror("send");
                 return -1;
@@ -183,6 +192,8 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
             printf("Number of channels: %s", response);
 
             return 1;
+        } else if (strcmp(buffer, "/time\n") == 0) {
+            *time_on = *time_on == 1 ? 0 : 1;
         }
     }
     return 0;
@@ -195,6 +206,7 @@ int main(int argc, char *argv[]) {
     int connected_to_channel = 0;
     char channel_name[MAX_CHANNEL_NAME_LENGTH] = "Unknown";
     char nickname[NICKNAME_SIZE] = "Unknown";
+    int time_on = 0;
 
     int port = 0;
     char *ip = NULL;
@@ -210,7 +222,8 @@ int main(int argc, char *argv[]) {
 
         // processing commands
         if (buffer[0] == '/') {
-            if (process_command(buffer, sock, ip, port, &connected_to_channel, channel_name, nickname)) {
+            if (process_command(buffer, sock, ip, port, &connected_to_channel, channel_name, nickname,
+                                &time_on)) {
                 continue;
             }
         }
@@ -232,10 +245,14 @@ int main(int argc, char *argv[]) {
 
         valread = read(sock, buffer, BUFFER_SIZE);
 
-        // time
-        char time_str[20];
-        format_time(time_str);
+        if (time_on) {
+            // time
+            char time_str[20];
+            format_time(time_str);
 
-        printf("[%s] Server: %s\n", time_str, buffer);
+            printf("[%s] Server: %s\n", time_str, buffer);
+        } else {
+            printf("Server: %s\n", buffer);
+        }
     }
 }
