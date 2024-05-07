@@ -1,33 +1,23 @@
+#include <openssl/sha.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
+void sha1_encode(const char *input_string, unsigned char *hash) {
+    SHA1((unsigned char *)input_string, strlen(input_string), hash);
+}
+
 int main() {
-    char input[100];  // предполагаем, что строка не будет длиннее 100 символов
-    char channelname[50];  // предполагаем, что название канала не будет длиннее 50 символов
-    char comment[50];  // предполагаем, что комментарий не будет длиннее 50 символов
+    char input_string[] = "Hello, world!";
+    unsigned char hash[SHA_DIGEST_LENGTH];
 
-    // Пример строки ввода
-    strcpy(input, "/add_channel channelname \"llololololasdol\"");
+    sha1_encode(input_string, hash);
 
-    // Ищем начало и конец названия канала
-    char *start = strchr(input, ' ') + 1;  // начало названия канала
-    char *end = strchr(start, ' ');        // конец названия канала
-
-    // Копируем название канала
-    strncpy(channelname, start, end - start);
-    channelname[end - start] = '\0';  // добавляем завершающий нулевой символ
-
-    // Ищем начало и конец комментария
-    start = strchr(end, '"') + 1;  // начало комментария
-    end = strchr(start + 1, '"');  // конец комментария
-
-    // Копируем комментарий
-    strncpy(comment, start, end - start);
-    comment[end - start] = '\0';  // добавляем завершающий нулевой символ
-
-    // Выводим результат
-    printf("Название канала: %s\n", channelname);
-    printf("Комментарий: %s\n", comment);
+    printf("SHA-1 hash of '%s' is: ", input_string);
+    for (int i = 0; i < SHA_DIGEST_LENGTH; i++) {
+        printf("%02x", hash[i]);
+    }
+    printf("\n");
 
     return 0;
 }

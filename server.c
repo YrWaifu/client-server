@@ -374,8 +374,24 @@ void log_message(char *channel_name, char *client_channel, char *client_nickname
         perror("Error opening log file");
     }
 
-    fprintf(log_file, "%s (%s:%d): %s\n", client_nickname, inet_ntoa(client_address.sin_addr),
-            ntohs(client_address.sin_port), buffer);
+    // time
+    time_t rawtime;
+    struct tm *timeinfo;
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
+    char *time_str = asctime(timeinfo);
+    time_str[strlen(time_str) - 1] = '\0';
+
+    // hash
+    unsigned char hash[SHA_DIGEST_LENGTH];
+    sha1_encode(buffer, hash);
+
+    fprintf(log_file, "[%s] %s (%s:%d): %s [Hash: ", time_str, client_nickname,
+            inet_ntoa(client_address.sin_addr), ntohs(client_address.sin_port), buffer);
+    for (int i = 0; i < SHA_DIGEST_LENGTH; i++) {
+        fprintf(log_file, "%02x", hash[i]);
+    }
+    fprintf(log_file, "]\n");
 
     fclose(log_file);
 }
@@ -647,6 +663,10 @@ char *get_client_channel(int socket, struct Client *clients) {
         }
     }
     return "Unknown";
+}
+
+void sha1_encode(const char *input_string, unsigned char *hash) {
+    SHA1((unsigned char *)input_string, strlen(input_string), hash);
 }
 
 int main(int argc, char *argv[]) {

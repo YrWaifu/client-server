@@ -2,11 +2,13 @@
 #include <bits/getopt_core.h>
 #include <getopt.h>
 #include <netinet/in.h>
+#include <openssl/sha.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/select.h>
 #include <sys/socket.h>
+#include <time.h>
 #include <unistd.h>
 
 #define PORT 8080
@@ -64,5 +66,7 @@ void log_message(char *channel_name, char *client_channel, char *client_nickname
 void del_channel(Channel *channels, int *num_channels, char *channel_name);
 void set_channel(Channel *channels, int num_channels, char *channel_name, char *new_comment);
 void send_last_channel_messages(int sd, char *channel_name);
+
+void sha1_encode(const char *input_string, unsigned char *hash);
 
 int main(int argc, char *argv[]);
