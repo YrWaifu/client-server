@@ -1,0 +1,11 @@
+127.0.0.1:8080 Olga channel3
+hello
+world
+!
+who
+am
+i
+i
+don't
+know
+wtf
