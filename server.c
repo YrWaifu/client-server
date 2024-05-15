@@ -475,7 +475,10 @@ int receive_message(int sd, char *buffer, struct Client *clients, int server_pau
 
                 return 1;
             } else if (strcmp(buffer, "/channels\n") == 0) {
-                        } else {
+                send_channel_list(sd, channels, num_channels);
+
+                return 1;
+            } else {
                 // Echo received message back to client
                 getpeername(sd, (struct sockaddr *)&client_address, (socklen_t *)&client_addrlen);
 
@@ -504,6 +507,30 @@ int receive_message(int sd, char *buffer, struct Client *clients, int server_pau
         }
     }
     return 0;
+}
+
+void send_channel_list(int client_socket, Channel *channels, int num_channels) {
+    char message[BUFFER_SIZE];
+    char temp[BUFFER_SIZE];
+    int message_length = 0;
+
+    message_length += snprintf(message + message_length, BUFFER_SIZE - message_length,
+                               "Total number of channels: %d\n", num_channels);
+    message_length += snprintf(message + message_length, BUFFER_SIZE - message_length, "Channels:\n");
+    for (int i = 0; i < num_channels; i++) {
+        snprintf(temp, BUFFER_SIZE, "  %d. Name: %s, Comment: %s, Num of clients: %d\n", i + 1,
+                 channels[i].channel, channels[i].comment, channels[i].num_clients);
+        if (message_length + strlen(temp) < BUFFER_SIZE) {
+            strcat(message, temp);
+            message_length += strlen(temp);
+        } else {
+            send(client_socket, message, strlen(message), 0);
+            strcpy(message, temp);
+            message_length = strlen(temp);
+        }
+    }
+
+    send(client_socket, message, strlen(message), 0);
 }
 
 void send_last_channel_messages(int sd, char *channel_name) {
