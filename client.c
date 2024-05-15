@@ -161,17 +161,13 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
 
             return 1;
         } else if (strcmp(buffer, "/read\n") == 0) {
-            for (int i = 0; i < MAX_LOG_LINES; i++) {
-                char message[MAX_LOG_LINE_LENGTH] = {""};
-                int valread = recv(sock, message, MAX_LOG_LINE_LENGTH, 0);
-                if (valread > 0) {
-                    message[valread] = '\0';
-                    printf("%s\n", message);
-                } else {
-                    printf("Failed to receive message from server\n");
-                    break;
-                }
-            }
+            send(sock, buffer, strlen(buffer), 0);
+
+            char message[MAX_LOG_LINE_LENGTH];
+            int valread;
+
+            valread = recv(sock, message, MAX_LOG_LINE_LENGTH, 0);
+            printf("%s", message);
 
             return 1;
         } else if (strcmp(buffer, "/channels\n") == 0) {

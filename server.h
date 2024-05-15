@@ -25,9 +25,6 @@
 
 #define NICKNAME_SIZE 32
 
-#define MAX_LOG_LINES 10
-#define MAX_LOG_LINE_LENGTH 256
-
 struct Client;
 struct Channel;
 

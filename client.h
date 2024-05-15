@@ -10,8 +10,6 @@
 #include "helper.h"
 
 #define BUFFER_SIZE 2048
-#define MAX_LOG_LINES 10
-#define MAX_LOG_LINE_LENGTH 256
 #define MAX_CHANNEL_NAME_LENGTH 30
 #define NICKNAME_SIZE 32
 

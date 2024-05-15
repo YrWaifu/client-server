@@ -463,7 +463,7 @@ int receive_message(int sd, char *buffer, struct Client *clients, int server_pau
                         break;
                     }
                 }
-            } else if (strcmp(buffer, "/read") == 0) {
+            } else if (strcmp(buffer, "/read\n") == 0) {
                 char *client_channel = get_client_channel(sd, clients);
 
                 if (strcmp(client_channel, "Unknown") == 0) {
@@ -472,6 +472,7 @@ int receive_message(int sd, char *buffer, struct Client *clients, int server_pau
                 } else {
                     send_last_channel_messages(sd, client_channel);
                 }
+
                 return 1;
             } else if (strcmp(buffer, "/channels") == 0) {
                 char response[BUFFER_SIZE];
@@ -514,27 +515,44 @@ int receive_message(int sd, char *buffer, struct Client *clients, int server_pau
 }
 
 void send_last_channel_messages(int sd, char *channel_name) {
-    char log_filename[256];
-    FILE *log_file;
-    char buffer[MAX_LOG_LINES][MAX_LOG_LINE_LENGTH];
-    int lines_count = 0;
-
+    char log_filename[100];
     sprintf(log_filename, "./logs/%s.log", channel_name);
+    FILE *log_file = fopen(log_filename, "r");
 
-    log_file = fopen(log_filename, "r");
     if (log_file == NULL) {
         perror("Error opening log file");
         return;
     }
 
-    while (fgets(buffer[lines_count % MAX_LOG_LINES], MAX_LOG_LINE_LENGTH, log_file) != NULL) {
-        lines_count++;
+    fseek(log_file, 0, SEEK_END);
+    if (ftell(log_file) == 0) {
+        char empty_channel_message[] = "Channel is currently empty.\n";
+        send(sd, empty_channel_message, strlen(empty_channel_message), 0);
+        fclose(log_file);
+        return;
+    }
+    rewind(log_file);
+
+    int num_lines = 0;
+    int ch;
+    while ((ch = fgetc(log_file)) != EOF) {
+        if (ch == '\n') {
+            num_lines++;
+        }
     }
 
-    int start_line = lines_count > MAX_LOG_LINES ? lines_count % MAX_LOG_LINES : 0;
+    rewind(log_file);
 
-    for (int i = start_line; i < lines_count; i++) {
-        send(sd, buffer[i % MAX_LOG_LINES], strlen(buffer[i % MAX_LOG_LINES]), 0);
+    int num_lines_to_skip = (num_lines > MAX_LOG_LINES) ? num_lines - MAX_LOG_LINES : 0;
+
+    for (int i = 0; i < num_lines_to_skip; i++) {
+        while ((ch = fgetc(log_file)) != '\n' && ch != EOF)
+            ;
+    }
+
+    char buffer[BUFFER_SIZE];
+    while (fgets(buffer, sizeof(buffer), log_file) != NULL) {
+        send(sd, buffer, strlen(buffer), 0);
     }
 
     fclose(log_file);
