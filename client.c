@@ -169,6 +169,8 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
             valread = recv(sock, message, MAX_LOG_LINE_LENGTH, 0);
             printf("%s", message);
 
+            memset(message, 0, sizeof(message));
+
             return 1;
         } else if (strcmp(buffer, "/channels\n") == 0) {
             if (send(sock, buffer, strlen(buffer), 0) < 0) {
