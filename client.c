@@ -183,7 +183,7 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
                 return -1;
             }
 
-            printf("Number of channels: %s", response);
+            printf("Number of channels: %s\n", response);
 
             return 1;
         } else if (strcmp(buffer, "/time\n") == 0) {
