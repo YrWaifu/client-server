@@ -2,3 +2,5 @@ server
 client
 helper.o
 a.out
+test_client_send
+test_client_read

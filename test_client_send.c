@@ -1,8 +1,13 @@
+#include <arpa/inet.h>
 #include <bits/getopt_core.h>
+#include <fcntl.h>
+#include <getopt.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -70,7 +75,9 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    // Open a pipe to the client process
+    int dev_null = open("/dev/null", O_WRONLY);
+    dup2(dev_null, STDOUT_FILENO);
+
     FILE *client = popen(command, "w");
     if (client == NULL) {
         perror("Error opening client process");
@@ -78,6 +85,8 @@ int main(int argc, char *argv[]) {
         fclose(file);
         exit(EXIT_FAILURE);
     }
+
+    close(dev_null);
 
     // Send nick and join commands
     fprintf(client, "/nick %s\n", nick);
