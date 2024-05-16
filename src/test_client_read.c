@@ -2,6 +2,7 @@
 #include <bits/getopt_core.h>
 #include <fcntl.h>
 #include <getopt.h>
+#include <openssl/sha.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -12,26 +13,24 @@
 #include <unistd.h>
 
 void print_usage(const char *program_name) {
-    fprintf(stderr, "Usage: %s -f <FILE_WITH_MESSAGES> -t <MESSAGE_PAUSE> [-r]\n", program_name);
+    fprintf(stderr, "Usage: %s -f <FILE_WITH_MESSAGES>\n", program_name);
+}
+
+void sha1_encode(const char *input_string, unsigned char *hash) {
+    SHA1((unsigned char *)input_string, strlen(input_string), hash);
 }
 
 int main(int argc, char *argv[]) {
     char *file_with_messages = NULL;
-    int message_pause = 0;
-    int repeat = 0;
+    int message_pause = 1;
     int opt;
+    int test_started = 0;
 
     // Parse command line arguments
-    while ((opt = getopt(argc, argv, "f:t:r")) != -1) {
+    while ((opt = getopt(argc, argv, "f:")) != -1) {
         switch (opt) {
             case 'f':
                 file_with_messages = optarg;
-                break;
-            case 't':
-                message_pause = atoi(optarg);
-                break;
-            case 'r':
-                repeat = 1;
                 break;
             default:
                 print_usage(argv[0]);
@@ -75,6 +74,9 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    // int dev_null = open("/dev/null", O_WRONLY);
+    // dup2(dev_null, STDOUT_FILENO);
+
     FILE *client = popen(command, "w");
     if (client == NULL) {
         perror("Error opening client process");
@@ -83,30 +85,31 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    // close(dev_null);
+
     // Send nick and join commands
-    fprintf(client, "/nick %s\n", nick);
+    fprintf(client, "/nick Checker\n");
     fflush(client);
     fprintf(client, "/join %s\n", channel);
     fflush(client);
 
-    do {
-        rewind(file);                // Go back to the beginning of the file
-        getline(&line, &len, file);  // Skip the first line
+    // getline(&line, &len, file);
 
-        while ((read = getline(&line, &len, file)) != -1) {
-            if (line[read - 1] == '\n') {
-                line[read - 1] = '\0';
-            }
-
-            // Write the message to the client process
-            fprintf(client, "%s\n", line);
-            fflush(client);
-
-            // Sleep for the specified duration
-            sleep(message_pause);
+    while (1) {
+        if (line[read - 1] == '\n') {
+            line[read - 1] = '\0';
         }
 
-    } while (repeat);
+        unsigned char hash[SHA_DIGEST_LENGTH];
+        sha1_encode(line, hash);
+
+        // Write the message to the client process
+        fprintf(client, "/read\n");
+        fflush(client);
+
+        // Sleep for the specified duration
+        sleep(message_pause);
+    }
 
     fprintf(client, "/exit\n");
     fflush(client);
