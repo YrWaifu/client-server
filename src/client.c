@@ -1,4 +1,4 @@
-#include "client.h"
+#include "../include/client.h"
 
 void print_help(char *argv[]) {
     printf("Usage: %s -p {PORT} -i {IP}\n", argv[0]);
@@ -12,6 +12,7 @@ void print_help(char *argv[]) {
     printf("  /join {CHANNEL} To join to channel\n");
     printf("  /read\tTo read last 10 messages from channel\n");
     printf("  /time\tTo switch on/off time\n ");
+    printf("  /channels\tList of channels\n");
     exit(EXIT_SUCCESS);
 }
 

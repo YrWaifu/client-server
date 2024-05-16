@@ -10,7 +10,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include "helper.h"
+#include "../include/helper.h"
 
 #define PORT 8080
 #define MAX_CLIENTS 10

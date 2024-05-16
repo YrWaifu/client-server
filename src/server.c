@@ -1,4 +1,4 @@
-#include "server.h"
+#include "../include/server.h"
 
 void print_help() {
     printf("Usage: ./server -p {port}\n");
@@ -330,7 +330,7 @@ void del_channel(Channel *channels, int *num_channels, char *channel_name) {
         fclose(file);
 
         char buffer[MAX_CHANNEL_NAME_LENGTH + 11];
-        sprintf(buffer, "./logs/%s.log", channel_name);
+        sprintf(buffer, "../logs/%s.log", channel_name);
         remove(buffer);
 
         printf("Channel '%s' successfully deleted\n", channel_name);
@@ -367,7 +367,7 @@ void print_channel_info(char *channel_name, Channel *channels, int num_channels,
 void log_message(char *channel_name, char *client_channel, char *client_nickname,
                  struct sockaddr_in client_address, char *buffer) {
     char log_filename[100];
-    sprintf(log_filename, "./logs/%s.log", channel_name);
+    sprintf(log_filename, "../logs/%s.log", channel_name);
     FILE *log_file = fopen(log_filename, "a");
 
     if (log_file == NULL) {
@@ -535,7 +535,7 @@ void send_channel_list(int client_socket, Channel *channels, int num_channels) {
 
 void send_last_channel_messages(int sd, char *channel_name) {
     char log_filename[100];
-    sprintf(log_filename, "./logs/%s.log", channel_name);
+    sprintf(log_filename, "../logs/%s.log", channel_name);
     FILE *log_file = fopen(log_filename, "r");
 
     if (log_file == NULL) {
@@ -565,8 +565,7 @@ void send_last_channel_messages(int sd, char *channel_name) {
     int num_lines_to_skip = (num_lines > MAX_LOG_LINES) ? num_lines - MAX_LOG_LINES : 0;
 
     for (int i = 0; i < num_lines_to_skip; i++) {
-        while ((ch = fgetc(log_file)) != '\n' && ch != EOF)
-            ;
+        while ((ch = fgetc(log_file)) != '\n' && ch != EOF);
     }
 
     char buffer[BUFFER_SIZE];
@@ -648,7 +647,7 @@ void add_channel(Channel *channels, char *channel_name, char *comment, int *num_
     (*num_channels)++;
 
     char log_filename[100];
-    sprintf(log_filename, "./logs/%s.log", channel_name);
+    sprintf(log_filename, "../logs/%s.log", channel_name);
     FILE *log_file = fopen(log_filename, "w");
 
     if (log_file == NULL) {

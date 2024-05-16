@@ -75,8 +75,8 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    int dev_null = open("/dev/null", O_WRONLY);
-    dup2(dev_null, STDOUT_FILENO);
+    // int dev_null = open("/dev/null", O_WRONLY);
+    // dup2(dev_null, STDOUT_FILENO);
 
     FILE *client = popen(command, "w");
     if (client == NULL) {
@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    close(dev_null);
+    // close(dev_null);
 
     // Send nick and join commands
     fprintf(client, "/nick %s\n", nick);

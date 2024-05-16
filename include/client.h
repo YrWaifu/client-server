@@ -7,7 +7,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include "helper.h"
+#include "../include/helper.h"
 
 #define BUFFER_SIZE 2048
 #define MAX_CHANNEL_NAME_LENGTH 30

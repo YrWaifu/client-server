@@ -1,0 +1,13 @@
+Unknown@Unknown::Server: nickname changed successfully
+Olga@Unknown::Server: connected successfully
+Olga@channel3::Server: success
+Olga@channel3::Server: success
+Olga@channel3::Server: success
+Olga@channel3::Server: success
+Olga@channel3::Server: success
+Olga@channel3::Server: success
+Olga@channel3::Server: success
+Olga@channel3::Server: success
+Olga@channel3::Server: success
+Olga@channel3::Server: success
+Olga@channel3::Disconnecting from server...
