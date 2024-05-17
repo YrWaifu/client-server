@@ -95,7 +95,7 @@ int main(int argc, char *argv[]) {
 
     // getline(&line, &len, file);
 
-    while (1) {
+    while ((read = getline(&line, &len, file)) != -1) {
         if (line[read - 1] == '\n') {
             line[read - 1] = '\0';
         }
@@ -106,6 +106,18 @@ int main(int argc, char *argv[]) {
         // Write the message to the client process
         fprintf(client, "/read\n");
         fflush(client);
+
+        // Read and print the client output
+        char client_output[1024];
+        while (fgets(client_output, sizeof(client_output), client) != NULL) {
+            // Process the output if needed
+            printf("%s", client_output);
+
+            // Break the loop after reading the expected log
+            if (strstr(client_output, "[Hash: ") != NULL) {
+                break;
+            }
+        }
 
         // Sleep for the specified duration
         sleep(message_pause);
