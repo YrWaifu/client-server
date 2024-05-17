@@ -1,5 +1,4 @@
 #include <arpa/inet.h>
-#include <bits/getopt_core.h>
 #include <fcntl.h>
 #include <getopt.h>
 #include <openssl/sha.h>
@@ -22,7 +21,6 @@ void sha1_encode(const char *input_string, unsigned char *hash) {
 
 int main(int argc, char *argv[]) {
     char *file_with_messages = NULL;
-    int message_pause = 1;
     int opt;
     int test_started = 0;
 
@@ -38,7 +36,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (file_with_messages == NULL || message_pause <= 0) {
+    if (file_with_messages == NULL) {
         print_usage(argv[0]);
         exit(EXIT_FAILURE);
     }
@@ -74,9 +72,10 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    // int dev_null = open("/dev/null", O_WRONLY);
-    // dup2(dev_null, STDOUT_FILENO);
+    // Debug: Print the command to be executed
+    printf("Executing command: %s\n", command);
 
+    // Open the client process for reading and writing
     FILE *client = popen(command, "w");
     if (client == NULL) {
         perror("Error opening client process");
@@ -85,42 +84,68 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    // close(dev_null);
-
     // Send nick and join commands
     fprintf(client, "/nick Checker\n");
     fflush(client);
     fprintf(client, "/join %s\n", channel);
     fflush(client);
 
-    // getline(&line, &len, file);
+    // Read messages and compute their hashes
+    char *messages[256];
+    unsigned char hashes[256][SHA_DIGEST_LENGTH];
+    int message_count = 0;
 
     while ((read = getline(&line, &len, file)) != -1) {
         if (line[read - 1] == '\n') {
             line[read - 1] = '\0';
         }
+        messages[message_count] = strdup(line);
+        sha1_encode(line, hashes[message_count]);
+        message_count++;
+    }
 
-        unsigned char hash[SHA_DIGEST_LENGTH];
-        sha1_encode(line, hash);
+    free(line);
+    fclose(file);
 
-        // Write the message to the client process
+    int message_index = 0;
+    int success = 1;  // Flag to indicate if all hashes match
+    char client_output[1024];
+
+    while (message_index < message_count) {
+        // Send /read command to the client process
         fprintf(client, "/read\n");
         fflush(client);
 
-        // Read and print the client output
-        char client_output[1024];
+        // Read the client output
         while (fgets(client_output, sizeof(client_output), client) != NULL) {
-            // Process the output if needed
+            // Print the output for debugging purposes
             printf("%s", client_output);
 
-            // Break the loop after reading the expected log
-            if (strstr(client_output, "[Hash: ") != NULL) {
-                break;
+            // Check if the test has started
+            if (!test_started && strstr(client_output, "TEST STARTED")) {
+                test_started = 1;
+                printf("Test started!\n");
+            }
+
+            // If test has started, compare hashes
+            if (test_started) {
+                if (strstr(client_output, messages[message_index])) {
+                    unsigned char hash[SHA_DIGEST_LENGTH];
+                    sha1_encode(messages[message_index], hash);
+                    if (memcmp(hash, hashes[message_index], SHA_DIGEST_LENGTH) == 0) {
+                        printf("Message '%s' hash matches\n", messages[message_index]);
+                    } else {
+                        printf("Message '%s' hash does not match\n", messages[message_index]);
+                        success = 0;
+                    }
+                    message_index++;
+                    break;
+                }
             }
         }
 
         // Sleep for the specified duration
-        sleep(message_pause);
+        sleep(1);
     }
 
     fprintf(client, "/exit\n");
@@ -129,8 +154,17 @@ int main(int argc, char *argv[]) {
     // Close the pipe
     pclose(client);
 
-    free(line);
-    fclose(file);
+    // Free allocated memory for messages
+    for (int i = 0; i < message_count; i++) {
+        free(messages[i]);
+    }
+
+    // Print the final result
+    if (success) {
+        printf("SUCCESS\n");
+    } else {
+        printf("FAIL\n");
+    }
 
     return 0;
 }
