@@ -16,11 +16,10 @@ for i in range(5):
     process.stdin.flush()
     
     # Читаем ответ из stdout
-    response = process.stdout.readline().strip()
+    response = process.stdout.read().strip()
     print(f"Ответ: {response}")
     
-    # Пауза в 1 секунду
-    time.sleep(1)
+    
 
 process.stdin.write('/exit\n')
 process.stdin.flush()

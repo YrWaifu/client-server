@@ -568,7 +568,11 @@ void send_last_channel_messages(int sd, char *channel_name) {
         while ((ch = fgetc(log_file)) != '\n' && ch != EOF);
     }
 
-    char buffer[BUFFER_SIZE];
+    // Очистка сокета перед отправкой
+    char buffer1[256];
+    while (recv(sd, buffer1, sizeof(buffer1), MSG_DONTWAIT) > 0);
+
+    char buffer[BUFFER_SIZE] = {0};
     while (fgets(buffer, sizeof(buffer), log_file) != NULL) {
         send(sd, buffer, strlen(buffer), 0);
     }

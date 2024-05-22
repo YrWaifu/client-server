@@ -170,10 +170,11 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
         } else if (strcmp(buffer, "/read\n") == 0) {
             send(sock, buffer, strlen(buffer), 0);
 
-            char message[MAX_LOG_LINE_LENGTH];
+            char message[MAX_LOG_LINE_LENGTH] = {0};
             int valread;
 
             valread = recv(sock, message, MAX_LOG_LINE_LENGTH, 0);
+            message[MAX_LOG_LINE_LENGTH - 1] = '\0';
             printf("%s", message);
             fflush(stdout);
 
