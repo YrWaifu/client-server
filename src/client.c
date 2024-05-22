@@ -66,6 +66,7 @@ int connect_to_server(char *ip, int port) {
 
     if (connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
         printf("Connection Failed: Server is paused or unavailable\n");
+        fflush(stdout);
         exit(EXIT_FAILURE);
     }
 
@@ -77,6 +78,7 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
     if (buffer[0] == '/') {
         if (strcmp(buffer, "/exit\n") == 0) {
             printf("Disconnecting from server...\n");
+            fflush(stdout);
             close(sock);
             exit(EXIT_SUCCESS);
         } else if (strncmp(buffer, "/nick", 5) == 0) {
@@ -102,8 +104,10 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
                 format_time(time_str);
 
                 printf("[%s] Server: %s\n", time_str, buffer);
+                fflush(stdout);
             } else {
                 printf("Server: %s\n", buffer);
+                fflush(stdout);
             }
 
             return 1;
@@ -148,8 +152,10 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
                 format_time(time_str);
 
                 printf("[%s] Server: %s\n", time_str, buffer);
+                fflush(stdout);
             } else {
                 printf("Server: %s\n", buffer);
+                fflush(stdout);
             }
 
             if (strcmp(buffer, "unknown channel") == 0) {
@@ -169,6 +175,7 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
 
             valread = recv(sock, message, MAX_LOG_LINE_LENGTH, 0);
             printf("%s", message);
+            fflush(stdout);
 
             memset(message, 0, sizeof(message));
 
@@ -216,6 +223,7 @@ int main(int argc, char *argv[]) {
 
     while (1) {
         printf("%s@%s::", nickname, channel_name);
+        fflush(stdout);
         memset(buffer, 0, sizeof(buffer));
         fgets(buffer, BUFFER_SIZE, stdin);
 
@@ -230,6 +238,7 @@ int main(int argc, char *argv[]) {
         // remove newline character from message
         if (!connected_to_channel) {
             printf("First connect to the channel /join {CHANNEL}\n");
+            fflush(stdout);
             continue;
         }
 
@@ -250,8 +259,10 @@ int main(int argc, char *argv[]) {
             format_time(time_str);
 
             printf("[%s] Server: %s\n", time_str, buffer);
+            fflush(stdout);
         } else {
             printf("Server: %s\n", buffer);
+            fflush(stdout);
         }
     }
 }
