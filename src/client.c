@@ -16,6 +16,10 @@ void print_help(char *argv[]) {
     exit(EXIT_SUCCESS);
 }
 
+void sha1_encode(const char *input_string, unsigned char *hash) {
+    SHA1((unsigned char *)input_string, strlen(input_string), hash);
+}
+
 void parse_arguments(int argc, char *argv[], int *port, char **ip) {
     int opt;
 
@@ -206,6 +210,65 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
     return 0;
 }
 
+void sign_up(int sockfd) {
+    char username[50];
+    char password[50];
+    char send_str[1024];
+    char hash_str[SHA_DIGEST_LENGTH * 2 + 1];
+
+    printf("Register a new user\n");
+    printf("Enter username: ");
+    scanf("%s", username);
+    printf("Enter password: ");
+    scanf("%s", password);
+
+    unsigned char hash[SHA_DIGEST_LENGTH];
+    sha1_encode(password, hash);
+
+    for (int i = 0; i < SHA_DIGEST_LENGTH; i++) {
+        sprintf(&hash_str[i * 2], "%02x", hash[i]);
+    }
+
+    sprintf(send_str, "NEWUSER %s:%s", username, hash_str);
+
+    send(sockfd, send_str, strlen(send_str), 0);
+}
+
+int log_in(int sockfd) {
+    char username[50];
+    char password[50];
+    unsigned char hash[SHA_DIGEST_LENGTH];
+    char hash_str[2 * SHA_DIGEST_LENGTH + 1];
+    char send_str[1024];
+    char recv_str[1024];
+    int recv_len;
+
+    printf("Login to an existing account\n");
+    printf("Enter username: ");
+    scanf("%s", username);
+    printf("Enter password: ");
+    scanf("%s", password);
+
+    sha1_encode(password, hash);
+    for (int i = 0; i < SHA_DIGEST_LENGTH; i++) {
+        sprintf(&hash_str[i * 2], "%02x", hash[i]);
+    }
+
+    sprintf(send_str, "USER %s:%s", username, hash_str);
+    send(sockfd, send_str, strlen(send_str), 0);
+
+    // Receive response from the server
+    recv_len = recv(sockfd, recv_str, 1024, 0);
+    recv_str[recv_len] = '\0';
+    printf("Server: %s\n", recv_str);
+
+    if (strcmp(recv_str, "Login successful\n") == 0) {
+        return 1;
+    }
+
+    return 0;
+}
+
 int main(int argc, char *argv[]) {
     int sock = 0, valread;
     struct sockaddr_in server_addr;
@@ -222,8 +285,30 @@ int main(int argc, char *argv[]) {
 
     sock = connect_to_server(ip, port);
 
+    int choice = 0;
+    int loggedIn = 0;
+    while (loggedIn == 0) {
+        printf("Press the button:\n1 - Sign up\n2 - Log in\n");
+        scanf("%d", &choice);
+
+        switch (choice) {
+            case 1:
+                sign_up(sock);
+                loggedIn = 1;
+                break;
+            case 2:
+                loggedIn = log_in(sock);
+                break;
+            default:
+                printf("Wrong choice\n");
+        }
+
+        printf("%d\n", loggedIn);
+    }
+
     while (1) {
         printf("%s@%s::", nickname, channel_name);
+        fflush(stdin);
         fflush(stdout);
         memset(buffer, 0, sizeof(buffer));
         fgets(buffer, BUFFER_SIZE, stdin);

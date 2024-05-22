@@ -478,6 +478,55 @@ int receive_message(int sd, char *buffer, struct Client *clients, int server_pau
                 send_channel_list(sd, channels, num_channels);
 
                 return 1;
+            } else if (strncmp(buffer, "NEWUSER ", 8) == 0) {
+                char *user_data = buffer + 8;
+                FILE *file = fopen("clients.txt", "a");
+                if (file == NULL) {
+                    perror("Could not open user file");
+                    close(sd);
+                    exit(1);
+                }
+                fprintf(file, "%s\n", user_data);
+
+                fclose(file);
+
+                return 1;
+            } else if (strncmp(buffer, "USER ", 5) == 0) {
+                char *user_data = buffer + 5;
+                char username[50], password_hash[SHA_DIGEST_LENGTH * 2 + 1];
+                sscanf(user_data, "%[^:]:%s", username, password_hash);
+
+                FILE *file = fopen("clients.txt", "r");
+                if (file == NULL) {
+                    perror("Could not open user file");
+                    close(sd);
+                    exit(1);
+                }
+
+                char file_line[MAX_LOG_LINE_LENGTH];
+                int user_found = 0;
+                while (fgets(file_line, sizeof(file_line), file)) {
+                    char file_username[50], file_password_hash[SHA_DIGEST_LENGTH * 2 + 1];
+                    sscanf(file_line, "%[^:]:%s", file_username, file_password_hash);
+
+                    if (strcmp(username, file_username) == 0) {
+                        if (strcmp(password_hash, file_password_hash) == 0) {
+                            send(sd, "Login successful\n", 18, 0);
+                            user_found = 1;
+                        } else {
+                            send(sd, "Invalid password\n", 17, 0);
+                        }
+                        break;
+                    }
+                }
+
+                if (!user_found) {
+                    send(sd, "User not found\n", 15, 0);
+                }
+
+                fclose(file);
+
+                return 1;
             } else {
                 // Echo received message back to client
                 getpeername(sd, (struct sockaddr *)&client_address, (socklen_t *)&client_addrlen);
