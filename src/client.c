@@ -260,7 +260,7 @@ int log_in(int sockfd) {
     // Receive response from the server
     recv_len = recv(sockfd, recv_str, 1024, 0);
     recv_str[recv_len] = '\0';
-    printf("Server: %s\n", recv_str);
+    printf("Server: %s", recv_str);
 
     if (strcmp(recv_str, "Login successful\n") == 0) {
         return 1;
@@ -302,8 +302,6 @@ int main(int argc, char *argv[]) {
             default:
                 printf("Wrong choice\n");
         }
-
-        printf("%d\n", loggedIn);
     }
 
     while (1) {

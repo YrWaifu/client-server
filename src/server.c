@@ -515,12 +515,13 @@ int receive_message(int sd, char *buffer, struct Client *clients, int server_pau
                             user_found = 1;
                         } else {
                             send(sd, "Invalid password\n", 17, 0);
+                            user_found = -1;
                         }
                         break;
                     }
                 }
 
-                if (!user_found) {
+                if (user_found == 0) {
                     send(sd, "User not found\n", 15, 0);
                 }
 
