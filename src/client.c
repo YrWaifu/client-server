@@ -174,15 +174,34 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
         } else if (strcmp(buffer, "/read\n") == 0) {
             send(sock, buffer, strlen(buffer), 0);
 
-            char message[MAX_LOG_LINE_LENGTH] = {0};
-            int valread;
+            char logs[BUFFER_SIZE];
+            memset(logs, 0, sizeof(logs));
 
-            valread = recv(sock, message, MAX_LOG_LINE_LENGTH, 0);
-            message[MAX_LOG_LINE_LENGTH - 1] = '\0';
-            printf("%s", message);
+            int total_bytes_received = 0;
+            int bytes_received = 0;
+            printf("ASD");
             fflush(stdout);
 
-            memset(message, 0, sizeof(message));
+            while ((bytes_received = recv(sock, logs + total_bytes_received,
+                                          sizeof(logs) - total_bytes_received, 0)) > 0) {
+                total_bytes_received += bytes_received;
+                if (logs[total_bytes_received - 1] == '\0') {
+                    break;  // End of logs
+                }
+                if (total_bytes_received >= sizeof(logs) - 1) {
+                    break;  // Buffer full
+                }
+            }
+
+            if (bytes_received < 0) {
+                perror("recv");
+                return -1;
+            }
+
+            logs[total_bytes_received] = '\0';  // Ensure null-terminated string
+
+            printf("Logs:\n%s\n", logs);
+            fflush(stdout);
 
             return 1;
         } else if (strcmp(buffer, "/channels\n") == 0) {
@@ -210,11 +229,13 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
     return 0;
 }
 
-void sign_up(int sockfd) {
+int sign_up(int sockfd) {
     char username[50];
     char password[50];
     char send_str[1024];
     char hash_str[SHA_DIGEST_LENGTH * 2 + 1];
+    char recv_str[1024];
+    int recv_len;
 
     printf("Register a new user\n");
     printf("Enter username: ");
@@ -232,6 +253,17 @@ void sign_up(int sockfd) {
     sprintf(send_str, "NEWUSER %s:%s", username, hash_str);
 
     send(sockfd, send_str, strlen(send_str), 0);
+
+    // Receive response from the server
+    recv_len = recv(sockfd, recv_str, 1024, 0);
+    recv_str[recv_len] = '\0';
+    printf("Server: %s", recv_str);
+
+    if (strcmp(recv_str, "User created successfully\n") == 0) {
+        return 1;
+    }
+
+    return 0;
 }
 
 int log_in(int sockfd) {
@@ -293,8 +325,7 @@ int main(int argc, char *argv[]) {
 
         switch (choice) {
             case 1:
-                sign_up(sock);
-                loggedIn = 1;
+                loggedIn = sign_up(sock);
                 break;
             case 2:
                 loggedIn = log_in(sock);

@@ -480,15 +480,45 @@ int receive_message(int sd, char *buffer, struct Client *clients, int server_pau
                 return 1;
             } else if (strncmp(buffer, "NEWUSER ", 8) == 0) {
                 char *user_data = buffer + 8;
-                FILE *file = fopen("clients.txt", "a");
+                int user_exist = 0;
+                char username[50], password_hash[SHA_DIGEST_LENGTH * 2 + 1];
+                sscanf(user_data, "%[^:]:%s", username, password_hash);
+
+                FILE *file = fopen("clients.txt", "r");
                 if (file == NULL) {
                     perror("Could not open user file");
                     close(sd);
                     exit(1);
                 }
-                fprintf(file, "%s\n", user_data);
+
+                char file_line[MAX_LOG_LINE_LENGTH];
+                int user_found = 0;
+                while (fgets(file_line, sizeof(file_line), file)) {
+                    char file_username[50], file_password_hash[SHA_DIGEST_LENGTH * 2 + 1];
+                    sscanf(file_line, "%[^:]:%s", file_username, file_password_hash);
+
+                    if (strcmp(username, file_username) == 0) {
+                        user_exist = 1;
+                    }
+                }
 
                 fclose(file);
+
+                if (user_exist == 1) {
+                    send(sd, "User exist\n", 15, 0);
+                } else {
+                    // Open the file again in append mode to add the new user
+                    file = fopen("clients.txt", "a");
+                    if (file == NULL) {
+                        perror("Could not open user file for appending");
+                        close(sd);
+                        exit(1);
+                    }
+
+                    fprintf(file, "%s\n", user_data);
+                    fclose(file);
+                    send(sd, "User created successfully\n", 27, 0);
+                }
 
                 return 1;
             } else if (strncmp(buffer, "USER ", 5) == 0) {
@@ -585,49 +615,39 @@ void send_channel_list(int client_socket, Channel *channels, int num_channels) {
 
 void send_last_channel_messages(int sd, char *channel_name) {
     char log_filename[100];
-    sprintf(log_filename, "../logs/%s.log", channel_name);
-    FILE *log_file = fopen(log_filename, "r");
+    snprintf(log_filename, sizeof(log_filename), "../logs/%s.log", channel_name);
 
+    FILE *log_file = fopen(log_filename, "r");
     if (log_file == NULL) {
         perror("Error opening log file");
+        send(sd, "No logs available\n", strlen("No logs available\n"), 0);
         return;
     }
 
-    fseek(log_file, 0, SEEK_END);
-    if (ftell(log_file) == 0) {
-        char empty_channel_message[] = "Channel is currently empty.\n";
-        send(sd, empty_channel_message, strlen(empty_channel_message), 0);
-        fclose(log_file);
-        return;
-    }
-    rewind(log_file);
-
-    int num_lines = 0;
-    int ch;
-    while ((ch = fgetc(log_file)) != EOF) {
-        if (ch == '\n') {
-            num_lines++;
-        }
+    char *lines[MAX_LOG_LINES];
+    for (int i = 0; i < MAX_LOG_LINES; i++) {
+        lines[i] = (char *)malloc(MAX_LOG_LINE_LENGTH);
+        memset(lines[i], 0, MAX_LOG_LINE_LENGTH);
     }
 
-    rewind(log_file);
-
-    int num_lines_to_skip = (num_lines > MAX_LOG_LINES) ? num_lines - MAX_LOG_LINES : 0;
-
-    for (int i = 0; i < num_lines_to_skip; i++) {
-        while ((ch = fgetc(log_file)) != '\n' && ch != EOF);
-    }
-
-    // Очистка сокета перед отправкой
-    char buffer1[256];
-    while (recv(sd, buffer1, sizeof(buffer1), MSG_DONTWAIT) > 0);
-
-    char buffer[BUFFER_SIZE] = {0};
+    int count = 0;
+    char buffer[MAX_LOG_LINE_LENGTH];
     while (fgets(buffer, sizeof(buffer), log_file) != NULL) {
-        send(sd, buffer, strlen(buffer), 0);
+        strncpy(lines[count % MAX_LOG_LINES], buffer, MAX_LOG_LINE_LENGTH);
+        count++;
+    }
+    fclose(log_file);
+
+    int start = (count > MAX_LOG_LINES) ? (count % MAX_LOG_LINES) : 0;
+    int num_lines_to_send = (count < MAX_LOG_LINES) ? count : MAX_LOG_LINES;
+
+    for (int i = 0; i < num_lines_to_send; i++) {
+        send(sd, lines[(start + i) % MAX_LOG_LINES], strlen(lines[(start + i) % MAX_LOG_LINES]), 0);
     }
 
-    fclose(log_file);
+    for (int i = 0; i < MAX_LOG_LINES; i++) {
+        free(lines[i]);
+    }
 }
 
 int channel_exists(Channel channels[], int num_channels, char *channel_name) {

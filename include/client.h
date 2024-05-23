@@ -12,7 +12,7 @@
 
 #include "../include/helper.h"
 
-#define BUFFER_SIZE 2048
+#define BUFFER_SIZE 4096
 #define MAX_CHANNEL_NAME_LENGTH 30
 #define NICKNAME_SIZE 32
 
@@ -22,7 +22,7 @@ int connect_to_server(char *ip, int port);
 int process_command(char *buffer, int sock, char *ip, int port, int *connected_to_channel,
                     char channel_name[MAX_CHANNEL_NAME_LENGTH], char nickname[NICKNAME_SIZE], int *time_on);
 void sha1_encode(const char *input_string, unsigned char *hash);
-void sign_up(int sockfd);
+int sign_up(int sockfd);
 int log_in(int sockfd);
 
 int main(int argc, char *argv[]);
