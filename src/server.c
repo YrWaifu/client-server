@@ -645,6 +645,10 @@ void send_last_channel_messages(int sd, char *channel_name) {
         send(sd, lines[(start + i) % MAX_LOG_LINES], strlen(lines[(start + i) % MAX_LOG_LINES]), 0);
     }
 
+    sleep(1);
+
+    send(sd, "F", 1, 0);
+
     for (int i = 0; i < MAX_LOG_LINES; i++) {
         free(lines[i]);
     }

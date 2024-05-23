@@ -179,12 +179,22 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
 
             int total_bytes_received = 0;
             int bytes_received = 0;
-            printf("ASD");
+            printf("ASD\n");
             fflush(stdout);
+
+            char received_message[BUFFER_SIZE];
 
             while ((bytes_received = recv(sock, logs + total_bytes_received,
                                           sizeof(logs) - total_bytes_received, 0)) > 0) {
                 total_bytes_received += bytes_received;
+                printf("%d\n", bytes_received);
+
+                memcpy(received_message, logs + total_bytes_received - bytes_received, bytes_received);
+                received_message[bytes_received] = '\0';
+
+                if (strcmp(received_message, "F")) {
+                    break;
+                }
                 if (logs[total_bytes_received - 1] == '\0') {
                     break;  // End of logs
                 }
