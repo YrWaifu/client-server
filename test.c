@@ -1,136 +1,57 @@
-#include <arpa/inet.h>
-#include <bits/getopt_core.h>
-#include <fcntl.h>
-#include <getopt.h>
-#include <openssl/sha.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <time.h>
-#include <unistd.h>
+У меня есть вот такая функция void send_last_channel_messages(int sd, char *channel_name) {
+    char log_filename[100];
+    snprintf(log_filename, sizeof(log_filename), "../logs/%s.log", channel_name);
 
-void print_usage(const char *program_name) {
-    fprintf(stderr, "Usage: %s -f <FILE_WITH_MESSAGES>\n", program_name);
+    FILE *log_file = fopen(log_filename, "r");
+    if (log_file == NULL) {
+        perror("Error opening log file");
+        send(sd, "No logs available\n", strlen("No logs available\n"), 0);
+        return;
+    }
+
+    char *lines[MAX_LOG_LINES];
+    for (int i = 0; i < MAX_LOG_LINES; i++) {
+        lines[i] = (char *)malloc(MAX_LOG_LINE_LENGTH);
+        memset(lines[i], 0, MAX_LOG_LINE_LENGTH);
+    }
+
+    int count = 0;
+    char buffer[MAX_LOG_LINE_LENGTH];
+    while (fgets(buffer, sizeof(buffer), log_file) != NULL) {
+        strncpy(lines[count % MAX_LOG_LINES], buffer, MAX_LOG_LINE_LENGTH);
+        count++;
+    }
+    fclose(log_file);
+
+    int start = (count > MAX_LOG_LINES) ? (count % MAX_LOG_LINES) : 0;
+    int num_lines_to_send = (count < MAX_LOG_LINES) ? count : MAX_LOG_LINES;
+
+    for (int i = 0; i < num_lines_to_send; i++) {
+        send(sd, lines[(start + i) % MAX_LOG_LINES], strlen(lines[(start + i) % MAX_LOG_LINES]), 0);
+    }
+
+    sleep(1);
+
+    send(sd, "F", 1, 0);
+
+    for (int i = 0; i < MAX_LOG_LINES; i++) {
+        free(lines[i]);
+    }
 }
-
-void sha1_encode(const char *input_string, unsigned char *hash) {
-    SHA1((unsigned char *)input_string, strlen(input_string), hash);
-}
-
-int main(int argc, char *argv[]) {
-    char *file_with_messages = NULL;
-    int message_pause = 1;
-    int opt;
-    int test_started = 0;
-
-    // Parse command line arguments
-    while ((opt = getopt(argc, argv, "f:")) != -1) {
-        switch (opt) {
-            case 'f':
-                file_with_messages = optarg;
-                break;
-            default:
-                print_usage(argv[0]);
-                exit(EXIT_FAILURE);
-        }
-    }
-
-    if (file_with_messages == NULL || message_pause <= 0) {
-        print_usage(argv[0]);
-        exit(EXIT_FAILURE);
-    }
-
-    FILE *file = fopen(file_with_messages, "r");
-    if (file == NULL) {
-        perror("Error opening file");
-        exit(EXIT_FAILURE);
-    }
-
-    char *line = NULL;
-    size_t len = 0;
-    ssize_t read;
-
-    // Read the first line for server IP, port, nick, and channel
-    if ((read = getline(&line, &len, file)) == -1) {
-        perror("Error reading file");
-        fclose(file);
-        exit(EXIT_FAILURE);
-    }
-
-    char server_ip[256], nick[256], channel[256];
-    int port;
-    sscanf(line, "%255[^:]:%d %255s %255s", server_ip, &port, nick, channel);
-
-    // Construct the command
-    char command[512];
-    int snprintf_result = snprintf(command, sizeof(command), "./client -i %s -p %d", server_ip, port);
-    if (snprintf_result < 0 || snprintf_result >= sizeof(command)) {
-        fprintf(stderr, "Error: command string too long\n");
-        free(line);
-        fclose(file);
-        exit(EXIT_FAILURE);
-    }
-
-    // int dev_null = open("/dev/null", O_WRONLY);
-    // dup2(dev_null, STDOUT_FILENO);
-
-    FILE *client = popen(command, "w");
-    if (client == NULL) {
-        perror("Error opening client process");
-        free(line);
-        fclose(file);
-        exit(EXIT_FAILURE);
-    }
-
-    // close(dev_null);
-
-    // Send nick and join commands
-    fprintf(client, "/nick Checker\n");
-    fflush(client);
-    fprintf(client, "/join %s\n", channel);
-    fflush(client);
-
-    // getline(&line, &len, file);
-
-    while ((read = getline(&line, &len, file)) != -1) {
-        if (line[read - 1] == '\n') {
-            line[read - 1] = '\0';
-        }
-
-        unsigned char hash[SHA_DIGEST_LENGTH];
-        sha1_encode(line, hash);
-
-        // Write the message to the client process
-        fprintf(client, "/read\n");
-        fflush(client);
-
-        // Read and print the client output
-        char client_output[1024];
-        while (fgets(client_output, sizeof(client_output), client) != NULL) {
-            // Process the output if needed
-            printf("%s", client_output);
-
-            // Break the loop after reading the expected log
-            if (strstr(client_output, "[Hash: ") != NULL) {
-                break;
-            }
-        }
-
-        // Sleep for the specified duration
-        sleep(message_pause);
-    }
-
-    fprintf(client, "/exit\n");
-    fflush(client);
-
-    // Close the pipe
-    pclose(client);
-
-    free(line);
-    fclose(file);
-
-    return 0;
-}
+сделать по - другому.Я хочу все строки записывать в в одно большое сообщение размером 2048(
+                 если не помещается в 2048,
+                 то таких сообщений может быть несколько)эти строки должны быть вида 00read00 *
+                 size *... *size *
+#!#message1 #$ #
+#!#message2 #$ #
+#!#message3 #$ #
+                 ...11endread11 Но вместо message1,
+    message2 и тп - строки из логов Символы переноса строки не нужны между строками,
+    я тебе их поставила для удобности чтения Напиши отдельную функцию для этого,
+    которая принимает на вход массив строк из
+    логов(message1, message2...) и возвращает массив строк уже кодированных размера 2048 Забыла уточнить,
+    в случае, если 2048 символов не хватает и приходится бить на 2 сообщения,
+    они получаются в виде 00read00 * size *... *size *#!#message1 #$##!#message2 #$ #... #!#mes sagen #$
+            ##!#messagen
+        + 1 #$ #11endread11 Вторая строка заполняется нулями до 2048 символа(то есть до конца) А еще,
+    в самом начале сообщения между *size *нужно поставить количество сообщений(строк логов)

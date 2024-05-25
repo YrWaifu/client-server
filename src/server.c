@@ -615,13 +615,37 @@ void send_channel_list(int client_socket, Channel *channels, int num_channels) {
 
 void send_last_channel_messages(int sd, char *channel_name) {
     char log_filename[100];
-    snprintf(log_filename, sizeof(log_filename), "../logs/%s.log", channel_name);
-
+    sprintf(log_filename, "../logs/%s.log", channel_name);
     FILE *log_file = fopen(log_filename, "r");
+
     if (log_file == NULL) {
         perror("Error opening log file");
-        send(sd, "No logs available\n", strlen("No logs available\n"), 0);
         return;
+    }
+
+    fseek(log_file, 0, SEEK_END);
+    if (ftell(log_file) == 0) {
+        char empty_channel_message[] = "Channel is currently empty.\n";
+        send(sd, empty_channel_message, strlen(empty_channel_message), 0);
+        fclose(log_file);
+        return;
+    }
+    rewind(log_file);
+
+    int num_lines = 0;
+    int ch;
+    while ((ch = fgetc(log_file)) != EOF) {
+        if (ch == '\n') {
+            num_lines++;
+        }
+    }
+
+    rewind(log_file);
+
+    int num_lines_to_skip = (num_lines > MAX_LOG_LINES) ? num_lines - MAX_LOG_LINES : 0;
+
+    for (int i = 0; i < num_lines_to_skip; i++) {
+        while ((ch = fgetc(log_file)) != '\n' && ch != EOF);
     }
 
     char *lines[MAX_LOG_LINES];
@@ -636,22 +660,13 @@ void send_last_channel_messages(int sd, char *channel_name) {
         strncpy(lines[count % MAX_LOG_LINES], buffer, MAX_LOG_LINE_LENGTH);
         count++;
     }
-    fclose(log_file);
-
-    int start = (count > MAX_LOG_LINES) ? (count % MAX_LOG_LINES) : 0;
-    int num_lines_to_send = (count < MAX_LOG_LINES) ? count : MAX_LOG_LINES;
-
-    for (int i = 0; i < num_lines_to_send; i++) {
-        send(sd, lines[(start + i) % MAX_LOG_LINES], strlen(lines[(start + i) % MAX_LOG_LINES]), 0);
-    }
-
-    sleep(1);
-
-    send(sd, "F", 1, 0);
 
     for (int i = 0; i < MAX_LOG_LINES; i++) {
+        printf("%s", lines[i]);
         free(lines[i]);
     }
+
+    fclose(log_file);
 }
 
 int channel_exists(Channel channels[], int num_channels, char *channel_name) {
