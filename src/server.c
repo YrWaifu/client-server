@@ -614,37 +614,36 @@ void send_channel_list(int client_socket, Channel *channels, int num_channels) {
 }
 
 char **format_lines(char **input_lines, int num_lines) {
-    char **output_lines = (char **)malloc(
-        (num_lines + 3) *
-        sizeof(char *));  // Allocate space for messages, read start, read end, and message count
+    char **output_lines = (char **)malloc((num_lines + 3) * sizeof(char *));
+
     if (output_lines == NULL) {
-        fprintf(stderr, "Memory allocation failed\n");
+        fprintf(stderr, "Memory error\n");
         exit(EXIT_FAILURE);
     }
 
-    // Initialize output lines
+    // Инициализация строк вывода
     for (int i = 0; i < num_lines + 3; i++) {
         output_lines[i] = (char *)malloc(MAX_OUTPUT_LINE_LENGTH * sizeof(char));
         if (output_lines[i] == NULL) {
-            fprintf(stderr, "Memory allocation failed\n");
+            fprintf(stderr, "Memory error\n");
             exit(EXIT_FAILURE);
         }
-        output_lines[i][0] = '\0';  // Ensure the string is empty initially
+        output_lines[i][0] = '\0';  // Обеспечить пустую строку изначально
     }
 
-    // Add read start marker
+    // Добавление маркера начала чтения
     strcpy(output_lines[0], READ_START);
     strcat(output_lines[0], "*");
     sprintf(output_lines[0] + strlen(output_lines[0]), "%d", num_lines);
     strcat(output_lines[0], "*");
 
-    // Format lines
-    int current_output_index = 1;  // Start after the read start marker
+    // Форматирование строк
+    int current_output_index = 1;  // Начать после маркера начала чтения
     int current_output_length =
-        strlen(READ_START) + strlen("*") + 2;  // Length of read start marker plus two '*' characters
+        strlen(READ_START) + strlen("*") + 2;  // Длина маркера начала чтения плюс два символа '*'
 
     for (int i = 0; i < num_lines; i++) {
-        // Remove newline characters from input lines
+        // Удаление символов переноса строки из входных строк
         char *newline_position = strchr(input_lines[i], '\n');
         if (newline_position != NULL) {
             *newline_position = '\0';
@@ -652,29 +651,29 @@ char **format_lines(char **input_lines, int num_lines) {
 
         int input_length = strlen(input_lines[i]);
 
-        // Check if adding this input line would exceed the maximum length
+        // Проверка, не превысит ли добавление этой строки максимальную длину
         if (current_output_length + input_length + strlen(DELIMITER_START) + strlen(DELIMITER_END) >=
             MAX_OUTPUT_LINE_LENGTH) {
             current_output_index++;
             current_output_length = 0;
         }
 
-        // Add the delimiter at the start of the line if it's not the first line in the output
+        // Добавление разделителя в начало строки, если это не первая строка в выводе
         if (current_output_length != 0) {
             strcat(output_lines[current_output_index], DELIMITER_START);
             current_output_length += strlen(DELIMITER_START);
         }
 
-        // Append the input line to the output
+        // Добавление входной строки в вывод
         strcat(output_lines[current_output_index], input_lines[i]);
         current_output_length += input_length;
 
-        // Add the delimiter at the end of the line
+        // Добавление разделителя в конец строки
         strcat(output_lines[current_output_index], DELIMITER_END);
         current_output_length += strlen(DELIMITER_END);
     }
 
-    // Add read end marker
+    // Добавление маркера конца чтения
     strcpy(output_lines[num_lines + 1], READ_END);
 
     return output_lines;
@@ -731,13 +730,9 @@ void send_last_channel_messages(int sd, char *channel_name) {
     // Format the lines
     char **formatted_lines = format_lines(lines, MAX_LOG_LINES);
 
-    // Print the formatted lines
-    for (int i = 0; i < MAX_LOG_LINES; i++) {
-        printf("%s\n", formatted_lines[i]);
-        free(formatted_lines[i]);  // Free memory allocated for each formatted line
+    for (int i = 0; i < MAX_LOG_LINES; ++i) {
+        send(sd, formatted_lines[i], MAX_LOG_LINE_LENGTH, 0);
     }
-
-    free(formatted_lines);  // Free memory allocated for the array of formatted lines
 
     fclose(log_file);
 }

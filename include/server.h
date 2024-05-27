@@ -25,12 +25,6 @@
 
 #define NICKNAME_SIZE 32
 
-#define MAX_OUTPUT_LINE_LENGTH 2048
-#define DELIMITER_START "#!#"
-#define DELIMITER_END "#$#"
-#define READ_START "00read00"
-#define READ_END "11endread11"
-
 struct Client;
 struct Channel;
 

@@ -117,6 +117,7 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
             return 1;
         } else if (strcmp(buffer, "/status\n") == 0) {
             printf("Current IP: %s, Port: %d\n", ip, port);
+            fflush(stdout);
 
             return 1;
         } else if (strncmp(buffer, "/connect", 8) == 0) {
@@ -125,6 +126,7 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
 
             if (new_ip == NULL || new_port == NULL) {
                 printf("Usage: /connect <ip> <port>\n");
+                fflush(stdout);
                 return 1;
             }
 
@@ -174,43 +176,30 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
         } else if (strcmp(buffer, "/read\n") == 0) {
             send(sock, buffer, strlen(buffer), 0);
 
-            char logs[BUFFER_SIZE];
-            memset(logs, 0, sizeof(logs));
+            char **output_lines = (char **)malloc((MAX_LOG_LINES + 3) * sizeof(char *));
 
-            int total_bytes_received = 0;
-            int bytes_received = 0;
-            printf("ASD\n");
-            fflush(stdout);
-
-            char received_message[BUFFER_SIZE];
-
-            while ((bytes_received = recv(sock, logs + total_bytes_received,
-                                          sizeof(logs) - total_bytes_received, 0)) > 0) {
-                total_bytes_received += bytes_received;
-                printf("%d\n", bytes_received);
-
-                memcpy(received_message, logs + total_bytes_received - bytes_received, bytes_received);
-                received_message[bytes_received] = '\0';
-
-                if (strcmp(received_message, "F")) {
-                    break;
-                }
-                if (logs[total_bytes_received - 1] == '\0') {
-                    break;  // End of logs
-                }
-                if (total_bytes_received >= sizeof(logs) - 1) {
-                    break;  // Buffer full
-                }
+            if (output_lines == NULL) {
+                fprintf(stderr, "Memory error\n");
+                exit(EXIT_FAILURE);
             }
 
-            if (bytes_received < 0) {
-                perror("recv");
-                return -1;
+            for (int i = 0; i < MAX_LOG_LINES + 3; i++) {
+                output_lines[i] = (char *)malloc(MAX_OUTPUT_LINE_LENGTH * sizeof(char));
+                if (output_lines[i] == NULL) {
+                    fprintf(stderr, "Memory error\n");
+                    exit(EXIT_FAILURE);
+                }
+                output_lines[i][0] = '\0';  // Обеспечить пустую строку изначально
             }
 
-            logs[total_bytes_received] = '\0';  // Ensure null-terminated string
+            for (int i = 0; i < MAX_LOG_LINES; ++i) {
+                recv(sock, output_lines[i], MAX_LOG_LINE_LENGTH, 0);
+                // printf("%s\n", output_lines[i]);
+                fflush(stdout);
+            }
 
-            printf("Logs:\n%s\n", logs);
+            decode_and_display(output_lines, MAX_LOG_LINES);
+
             fflush(stdout);
 
             return 1;
@@ -228,6 +217,7 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
             }
 
             printf("%s", response);
+            fflush(stdout);
 
             return 1;
         } else if (strcmp(buffer, "/time\n") == 0) {
@@ -237,6 +227,25 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
         }
     }
     return 0;
+}
+
+void decode_and_display(char **encoded_lines, int num_messages) {
+    for (int i = 0; i < num_messages; ++i) {
+        char *line = encoded_lines[i];
+        char *start = strstr(line, DELIMITER_START);
+        while (start != NULL) {
+            start += strlen(DELIMITER_START);  // Переместиться за начало разделителя
+            char *end = strstr(start, DELIMITER_END);
+            if (end != NULL) {
+                *end = '\0';  // Замена конца разделителя на нуль-терминатор, чтобы завершить строку
+                printf("%s\n", start);  // Вывод сообщения
+                fflush(stdout);
+                start = end + strlen(DELIMITER_END);  // Переместиться за конец разделителя
+            } else {
+                break;  // Если нет конца разделителя, прекратить обработку
+            }
+        }
+    }
 }
 
 int sign_up(int sockfd) {
@@ -252,6 +261,7 @@ int sign_up(int sockfd) {
     scanf("%s", username);
     printf("Enter password: ");
     scanf("%s", password);
+    fflush(stdout);
 
     unsigned char hash[SHA_DIGEST_LENGTH];
     sha1_encode(password, hash);
@@ -268,6 +278,7 @@ int sign_up(int sockfd) {
     recv_len = recv(sockfd, recv_str, 1024, 0);
     recv_str[recv_len] = '\0';
     printf("Server: %s", recv_str);
+    fflush(stdout);
 
     if (strcmp(recv_str, "User created successfully\n") == 0) {
         return 1;
@@ -290,6 +301,7 @@ int log_in(int sockfd) {
     scanf("%s", username);
     printf("Enter password: ");
     scanf("%s", password);
+    fflush(stdout);
 
     sha1_encode(password, hash);
     for (int i = 0; i < SHA_DIGEST_LENGTH; i++) {
@@ -303,6 +315,7 @@ int log_in(int sockfd) {
     recv_len = recv(sockfd, recv_str, 1024, 0);
     recv_str[recv_len] = '\0';
     printf("Server: %s", recv_str);
+    fflush(stdout);
 
     if (strcmp(recv_str, "Login successful\n") == 0) {
         return 1;
@@ -331,6 +344,7 @@ int main(int argc, char *argv[]) {
     int loggedIn = 0;
     while (loggedIn == 0) {
         printf("Press the button:\n1 - Sign up\n2 - Log in\n");
+        fflush(stdout);
         scanf("%d", &choice);
 
         switch (choice) {

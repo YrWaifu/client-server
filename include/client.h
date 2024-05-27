@@ -26,5 +26,6 @@ int process_command(char *buffer, int sock, char *ip, int port, int *connected_t
 void sha1_encode(const char *input_string, unsigned char *hash);
 int sign_up(int sockfd);
 int log_in(int sockfd);
+void decode_and_display(char **encoded_lines, int num_messages);
 
 int main(int argc, char *argv[]);
