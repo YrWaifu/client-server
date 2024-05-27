@@ -89,6 +89,12 @@ int main(int argc, char *argv[]) {
     // close(dev_null);
 
     // Send nick and join commands
+    fprintf(client, "2\n");
+    fflush(client);
+    fprintf(client, "1\n");
+    fflush(client);
+    fprintf(client, "1\n");
+    fflush(client);
     fprintf(client, "/nick %s\n", nick);
     fflush(client);
     fprintf(client, "/join %s\n", channel);
