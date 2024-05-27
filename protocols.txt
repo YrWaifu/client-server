@@ -9,7 +9,6 @@
 #!#message2#$#
 #!#message3#$#
 ...
-11endread11
 
 /join
 00join00

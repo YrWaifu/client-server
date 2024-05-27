@@ -234,15 +234,15 @@ void decode_and_display(char **encoded_lines, int num_messages) {
         char *line = encoded_lines[i];
         char *start = strstr(line, DELIMITER_START);
         while (start != NULL) {
-            start += strlen(DELIMITER_START);  // Переместиться за начало разделителя
+            start += strlen(DELIMITER_START);
             char *end = strstr(start, DELIMITER_END);
             if (end != NULL) {
-                *end = '\0';  // Замена конца разделителя на нуль-терминатор, чтобы завершить строку
-                printf("%s\n", start);  // Вывод сообщения
+                *end = '\0';
+                printf("%s\n", start);
                 fflush(stdout);
-                start = end + strlen(DELIMITER_END);  // Переместиться за конец разделителя
+                start = end + strlen(DELIMITER_END);
             } else {
-                break;  // Если нет конца разделителя, прекратить обработку
+                break;
             }
         }
     }

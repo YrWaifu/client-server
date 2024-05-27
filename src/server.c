@@ -621,29 +621,24 @@ char **format_lines(char **input_lines, int num_lines) {
         exit(EXIT_FAILURE);
     }
 
-    // Инициализация строк вывода
     for (int i = 0; i < num_lines + 3; i++) {
         output_lines[i] = (char *)malloc(MAX_OUTPUT_LINE_LENGTH * sizeof(char));
         if (output_lines[i] == NULL) {
             fprintf(stderr, "Memory error\n");
             exit(EXIT_FAILURE);
         }
-        output_lines[i][0] = '\0';  // Обеспечить пустую строку изначально
+        output_lines[i][0] = '\0';
     }
 
-    // Добавление маркера начала чтения
     strcpy(output_lines[0], READ_START);
     strcat(output_lines[0], "*");
     sprintf(output_lines[0] + strlen(output_lines[0]), "%d", num_lines);
     strcat(output_lines[0], "*");
 
-    // Форматирование строк
-    int current_output_index = 1;  // Начать после маркера начала чтения
-    int current_output_length =
-        strlen(READ_START) + strlen("*") + 2;  // Длина маркера начала чтения плюс два символа '*'
+    int current_output_index = 1;
+    int current_output_length = strlen(READ_START) + strlen("*") + 2;
 
     for (int i = 0; i < num_lines; i++) {
-        // Удаление символов переноса строки из входных строк
         char *newline_position = strchr(input_lines[i], '\n');
         if (newline_position != NULL) {
             *newline_position = '\0';
@@ -651,29 +646,24 @@ char **format_lines(char **input_lines, int num_lines) {
 
         int input_length = strlen(input_lines[i]);
 
-        // Проверка, не превысит ли добавление этой строки максимальную длину
         if (current_output_length + input_length + strlen(DELIMITER_START) + strlen(DELIMITER_END) >=
             MAX_OUTPUT_LINE_LENGTH) {
             current_output_index++;
             current_output_length = 0;
         }
 
-        // Добавление разделителя в начало строки, если это не первая строка в выводе
         if (current_output_length != 0) {
             strcat(output_lines[current_output_index], DELIMITER_START);
             current_output_length += strlen(DELIMITER_START);
         }
 
-        // Добавление входной строки в вывод
         strcat(output_lines[current_output_index], input_lines[i]);
         current_output_length += input_length;
 
-        // Добавление разделителя в конец строки
         strcat(output_lines[current_output_index], DELIMITER_END);
         current_output_length += strlen(DELIMITER_END);
     }
 
-    // Добавление маркера конца чтения
     strcpy(output_lines[num_lines + 1], READ_END);
 
     return output_lines;
