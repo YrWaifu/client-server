@@ -63,7 +63,7 @@ void log_message(char *channel_name, char *client_channel, char *client_nickname
                  struct sockaddr_in client_address, char *buffer);
 void del_channel(Channel *channels, int *num_channels, char *channel_name);
 void set_channel(Channel *channels, int num_channels, char *channel_name, char *new_comment);
-void send_last_channel_messages(int sd, char *channel_name);
+void send_last_channel_messages(int sd, char *channel_name, int num_lines);
 void send_channel_list(int client_socket, Channel *channels, int num_channels);
 
 void sha1_encode(const char *input_string, unsigned char *hash);

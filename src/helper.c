@@ -1,5 +1,6 @@
 #include "../include/helper.h"
 
+// Function to format time
 void format_time(char *time_str) {
     // time
     time_t rawtime;

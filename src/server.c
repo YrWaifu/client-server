@@ -1,5 +1,6 @@
 #include "../include/server.h"
 
+// Function to print the help message
 void print_help() {
     printf("Usage: ./server -p {port}\n");
     printf("Options:\n");
@@ -12,26 +13,28 @@ void print_help() {
     printf("  /change {PORT}\tTo change port\n");
     printf("  /status\tTo get status of the server\n");
     printf("  /add_channel {NAME} \"{COMMENT}\"\tTo add new channel\n");
-    printf("  /add_channel {NAME} \"{COMMENT}\"\tChange existing channel\n");
+    printf("  /set_channel {NAME} \"{COMMENT}\"\tChange existing channel\n");
     printf("  /del_channel {NAME}\tTo delete channel\n");
     printf("  /info {NAME}\tTo take info about channel\n");
     printf("  /channels\tList of channels\n");
-    exit(EXIT_SUCCESS);
 }
 
+// Function to parse command-line arguments
 void parse_arguments(int argc, char *argv[], int *port) {
     int opt;
 
+    // Define the long options for getopt
     struct option long_options[] = {
         {"port", required_argument, 0, 'p'}, {"help", no_argument, 0, 'h'}, {0, 0, 0, 0}};
 
+    // Parse the arguments using getopt_long
     while ((opt = getopt_long(argc, argv, "p:h", long_options, NULL)) != -1) {
         switch (opt) {
             case 'p':
-                *port = atoi(optarg);
+                *port = atoi(optarg);  // Set port from argument
                 break;
             case 'h':
-                print_help();
+                print_help();  // Print help message
                 break;
             default:
                 fprintf(stderr, "Usage: %s -p {port}\n", argv[0]);
@@ -39,12 +42,15 @@ void parse_arguments(int argc, char *argv[], int *port) {
         }
     }
 
+    // Set default port if not provided
     if (*port == 0) {
-        *port = PORT;
+        *port = PORT;  // PORT should be defined elsewhere in your code
     }
 }
 
+// Function to set up the server
 void setup_server(int *server_fd, int port, Client *clients, struct sockaddr_in *address) {
+    // Create socket
     if ((*server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
         perror("socket failed");
         exit(EXIT_FAILURE);
@@ -54,16 +60,19 @@ void setup_server(int *server_fd, int port, Client *clients, struct sockaddr_in 
     address->sin_addr.s_addr = INADDR_ANY;
     address->sin_port = htons(port);
 
+    // Bind the socket to the address and port
     if (bind(*server_fd, (struct sockaddr *)address, sizeof(*address)) < 0) {
         perror("bind failed");
         exit(EXIT_FAILURE);
     }
 
+    // Listen for incoming connections
     if (listen(*server_fd, MAX_CLIENTS) < 0) {
         perror("listen");
         exit(EXIT_FAILURE);
     }
 
+    // Initialize client sockets to 0 (not connected)
     for (int i = 0; i < MAX_CLIENTS; i++) {
         clients[i].socket = 0;
         strcpy(clients[i].nickname, "Unknown");
@@ -72,6 +81,7 @@ void setup_server(int *server_fd, int port, Client *clients, struct sockaddr_in 
     printf("Server listening on port %d\n", port);
 }
 
+// Function to get the nickname of a client by their socket
 char *get_client_nickname(int socket, struct Client *clients) {
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (clients[i].socket == socket) {
@@ -81,8 +91,10 @@ char *get_client_nickname(int socket, struct Client *clients) {
     return "Unknown";
 }
 
+// Function to process commands from stdin
 int process_command(char *cmd, int server_fd, struct Client *clients, struct sockaddr_in *address, int *port,
                     int *server_paused, Channel *channels, int *num_channels) {
+    // Command "stop" or "exit"
     if (strcmp(cmd, "/stop") == 0 || strcmp(cmd, "/exit") == 0) {
         printf("Stopping the server...\n");
         close(server_fd);
@@ -92,16 +104,19 @@ int process_command(char *cmd, int server_fd, struct Client *clients, struct soc
             }
         }
         exit(EXIT_SUCCESS);
+        // Command "pause"
     } else if (strcmp(cmd, "/pause") == 0) {
         printf("Pausing the server...\n");
         *server_paused = 1;
 
         return 1;
+        // Command "resume"
     } else if (strcmp(cmd, "/resume") == 0) {
         printf("Resuming the server...\n");
         *server_paused = 0;
 
         return 1;
+        // Command "change" to change port
     } else if (strncmp(cmd, "/change ", 8) == 0) {
         int new_port = atoi(cmd + 7);
 
@@ -134,6 +149,7 @@ int process_command(char *cmd, int server_fd, struct Client *clients, struct soc
 
             return 1;
         }
+        // Command "status" to see number of connected clients
     } else if (strcmp(cmd, "/status") == 0) {
         int connected_clients = 0;
 
@@ -144,6 +160,7 @@ int process_command(char *cmd, int server_fd, struct Client *clients, struct soc
         }
         printf("Number of connected clients: %d\n", connected_clients);
         return 1;
+        // Command "info" to see channel info
     } else if (strncmp(cmd, "/info ", 6) == 0) {
         char channel_name[MAX_CHANNEL_NAME_LENGTH];
         strcpy(channel_name, cmd + 6);
@@ -156,6 +173,7 @@ int process_command(char *cmd, int server_fd, struct Client *clients, struct soc
         print_channel_info(channel_name, channels, *num_channels, clients);
 
         return 1;
+        // Command "add_channel"
     } else if (strncmp(cmd, "/add_channel ", 13) == 0) {
         char *channel_start = cmd + 13;
 
@@ -198,6 +216,7 @@ int process_command(char *cmd, int server_fd, struct Client *clients, struct soc
         add_channel(channels, channel_name, comment, num_channels);
 
         return 1;
+        // Command "del_channel"
     } else if (strncmp(cmd, "/del_channel ", 13) == 0) {
         char channel_name[MAX_CHANNEL_NAME_LENGTH];
         strcpy(channel_name, cmd + 13);
@@ -210,6 +229,7 @@ int process_command(char *cmd, int server_fd, struct Client *clients, struct soc
         del_channel(channels, num_channels, channel_name);
 
         return 1;
+        // Command "set_channel"
     } else if (strncmp(cmd, "/set_channel ", 13) == 0) {
         char *channel_start = cmd + 13;
 
@@ -252,10 +272,12 @@ int process_command(char *cmd, int server_fd, struct Client *clients, struct soc
         set_channel(channels, *num_channels, channel_name, new_comment);
 
         return 1;
+        // Command "help"
     } else if (strcmp(cmd, "/help") == 0) {
         print_help();
         return 1;
-    } else if (strcmp(cmd, "/channels") == 0) {
+        // Command "channels"
+    } else if ((strcmp(cmd, "/channels") == 0) || (strcmp(cmd, "/info") == 0)) {
         print_channels(channels, *num_channels);
         return 1;
     } else {
@@ -266,6 +288,7 @@ int process_command(char *cmd, int server_fd, struct Client *clients, struct soc
     return 0;
 }
 
+// Function to set a new comment for an existing channel
 void set_channel(Channel *channels, int num_channels, char *channel_name, char *new_comment) {
     int found = 0;
 
@@ -278,6 +301,7 @@ void set_channel(Channel *channels, int num_channels, char *channel_name, char *
     }
 
     if (found) {
+        // Update the channels file with the new comment
         FILE *file = fopen("channels.txt", "w");
         if (file == NULL) {
             perror("Error opening file");
@@ -296,6 +320,7 @@ void set_channel(Channel *channels, int num_channels, char *channel_name, char *
     }
 }
 
+// Function to delete a channel
 void del_channel(Channel *channels, int *num_channels, char *channel_name) {
     int found = 0;
     int index = -1;
@@ -309,6 +334,7 @@ void del_channel(Channel *channels, int *num_channels, char *channel_name) {
     }
 
     if (found) {
+        // Shift the channels array to remove the deleted channel
         for (int i = index; i < *num_channels - 1; i++) {
             strcpy(channels[i].channel, channels[i + 1].channel);
             strcpy(channels[i].comment, channels[i + 1].comment);
@@ -317,6 +343,7 @@ void del_channel(Channel *channels, int *num_channels, char *channel_name) {
 
         (*num_channels)--;
 
+        // Update the channels file
         FILE *file = fopen("channels.txt", "w");
         if (file == NULL) {
             perror("Error opening file");
@@ -329,6 +356,7 @@ void del_channel(Channel *channels, int *num_channels, char *channel_name) {
 
         fclose(file);
 
+        // Remove the channel log file
         char buffer[MAX_CHANNEL_NAME_LENGTH + 11];
         sprintf(buffer, "../logs/%s.log", channel_name);
         remove(buffer);
@@ -339,6 +367,7 @@ void del_channel(Channel *channels, int *num_channels, char *channel_name) {
     }
 }
 
+// Function to print information about a channel
 void print_channel_info(char *channel_name, Channel *channels, int num_channels, struct Client *clients) {
     for (int i = 0; i < num_channels; ++i) {
         if (strcmp(channels[i].channel, channel_name) == 0) {
@@ -346,6 +375,7 @@ void print_channel_info(char *channel_name, Channel *channels, int num_channels,
             printf("Comment: %s\n", channels[i].comment);
             printf("Connected clients:\n");
 
+            // Print the list of clients connected to the channel
             for (int j = 0; j < channels[i].num_clients; ++j) {
                 int client_socket = channels[i].clients[j].socket;
                 struct sockaddr_in client_addr;
@@ -364,6 +394,7 @@ void print_channel_info(char *channel_name, Channel *channels, int num_channels,
     printf("Channel '%s' not found\n", channel_name);
 }
 
+// Function to log a message
 void log_message(char *channel_name, char *client_channel, char *client_nickname,
                  struct sockaddr_in client_address, char *buffer) {
     char log_filename[100];
@@ -374,16 +405,26 @@ void log_message(char *channel_name, char *client_channel, char *client_nickname
         perror("Error opening log file");
     }
 
-    // time
+    // Get the current time
     char time_str[20];
     format_time(time_str);
 
-    // hash
-    unsigned char hash[SHA_DIGEST_LENGTH];
-    sha1_encode(buffer, hash);
+    // Create a string with the message, time, date, and nickname
+    char log_entry[1024];
+    sprintf(log_entry, "[%s] %s (%s:%d): %s", time_str, client_nickname, inet_ntoa(client_address.sin_addr),
+            ntohs(client_address.sin_port), buffer);
 
-    fprintf(log_file, "[%s] %s (%s:%d): %s [Hash: ", time_str, client_nickname,
-            inet_ntoa(client_address.sin_addr), ntohs(client_address.sin_port), buffer);
+    // Generate the hash of the message including the time, date, and nickname
+    char hash_input[1024];
+    sprintf(hash_input, "%s%s%s", buffer, time_str, client_nickname);
+
+    // printf("\n%s\n", hash_input);
+
+    unsigned char hash[SHA_DIGEST_LENGTH];
+    sha1_encode(hash_input, hash);
+
+    // Write the log entry
+    fprintf(log_file, "%s [Hash: ", log_entry);
     for (int i = 0; i < SHA_DIGEST_LENGTH; i++) {
         fprintf(log_file, "%02x", hash[i]);
     }
@@ -392,6 +433,7 @@ void log_message(char *channel_name, char *client_channel, char *client_nickname
     fclose(log_file);
 }
 
+// Function to receive a message from a client
 int receive_message(int sd, char *buffer, struct Client *clients, int server_paused, Channel *channels,
                     int num_channels) {
     struct sockaddr_in client_address;
@@ -407,7 +449,15 @@ int receive_message(int sd, char *buffer, struct Client *clients, int server_pau
         // Find and reset client socket
         for (int i = 0; i < MAX_CLIENTS; i++) {
             if (clients[i].socket == sd) {
+                // Decrease the number of clients in the channel the client was connected to
+                for (int j = 0; j < num_channels; j++) {
+                    if (strcmp(clients[i].channel, channels[j].channel) == 0) {
+                        channels[j].num_clients--;
+                        break;
+                    }
+                }
                 clients[i].socket = 0;
+                strcpy(clients[i].channel, "Unknown");
                 break;
             }
         }
@@ -453,8 +503,16 @@ int receive_message(int sd, char *buffer, struct Client *clients, int server_pau
                     return 1;
                 }
 
+                // Update client channel
                 for (int i = 0; i < MAX_CLIENTS; i++) {
                     if (clients[i].socket == sd) {
+                        for (int j = 0; j < num_channels; j++) {
+                            if (strcmp(clients[i].channel, channels[j].channel) == 0) {
+                                channels[j].num_clients--;
+                                break;
+                            }
+                        }
+
                         strcpy(clients[i].channel, channel_name);
                         printf("Client %s:%d connected to %s\n", inet_ntoa(client_address.sin_addr),
                                ntohs(client_address.sin_port), channel_name);
@@ -463,22 +521,30 @@ int receive_message(int sd, char *buffer, struct Client *clients, int server_pau
                         break;
                     }
                 }
-            } else if (strcmp(buffer, "/read\n") == 0) {
+            } else if ((strncmp(buffer, "/read ", 6) == 0) || (strcmp(buffer, "/read\n") == 0)) {
+                // Handle read command
+                int num_lines = atoi(buffer + 6);
+                if (num_lines <= 0) {
+                    num_lines = MAX_LOG_LINES;
+                }
+
                 char *client_channel = get_client_channel(sd, clients);
 
                 if (strcmp(client_channel, "Unknown") == 0) {
                     send(sd, "You are not connected to any channel\0",
                          strlen("You are not connected to any channel\0"), 0);
                 } else {
-                    send_last_channel_messages(sd, client_channel);
+                    send_last_channel_messages(sd, client_channel, num_lines);
                 }
 
                 return 1;
             } else if (strcmp(buffer, "/channels\n") == 0) {
+                // Handle channels command
                 send_channel_list(sd, channels, num_channels);
 
                 return 1;
             } else if (strncmp(buffer, "NEWUSER ", 8) == 0) {
+                // Handle new user registration
                 char *user_data = buffer + 8;
                 int user_exist = 0;
                 char username[50], password_hash[SHA_DIGEST_LENGTH * 2 + 1];
@@ -495,7 +561,7 @@ int receive_message(int sd, char *buffer, struct Client *clients, int server_pau
                 int user_found = 0;
                 while (fgets(file_line, sizeof(file_line), file)) {
                     char file_username[50], file_password_hash[SHA_DIGEST_LENGTH * 2 + 1];
-                    sscanf(file_line, "%[^:]:%s", file_username, file_password_hash);
+                    sscanf(file_line, "%[^:]:%s %*[^]]", file_username, file_password_hash);
 
                     if (strcmp(username, file_username) == 0) {
                         user_exist = 1;
@@ -515,13 +581,17 @@ int receive_message(int sd, char *buffer, struct Client *clients, int server_pau
                         exit(1);
                     }
 
-                    fprintf(file, "%s\n", user_data);
+                    char date_str[20];
+                    format_time(date_str);
+                    fprintf(file, "%s [%s]\n", user_data, date_str);
+
                     fclose(file);
                     send(sd, "User created successfully\n", 27, 0);
                 }
 
                 return 1;
             } else if (strncmp(buffer, "USER ", 5) == 0) {
+                // Handle user login
                 char *user_data = buffer + 5;
                 char username[50], password_hash[SHA_DIGEST_LENGTH * 2 + 1];
                 sscanf(user_data, "%[^:]:%s", username, password_hash);
@@ -537,7 +607,7 @@ int receive_message(int sd, char *buffer, struct Client *clients, int server_pau
                 int user_found = 0;
                 while (fgets(file_line, sizeof(file_line), file)) {
                     char file_username[50], file_password_hash[SHA_DIGEST_LENGTH * 2 + 1];
-                    sscanf(file_line, "%[^:]:%s", file_username, file_password_hash);
+                    sscanf(file_line, "%[^:]:%s %*[^]]", file_username, file_password_hash);
 
                     if (strcmp(username, file_username) == 0) {
                         if (strcmp(password_hash, file_password_hash) == 0) {
@@ -571,7 +641,7 @@ int receive_message(int sd, char *buffer, struct Client *clients, int server_pau
                     }
                 }
 
-                // time
+                // Get the current time
                 char time_str[20];
                 format_time(time_str);
 
@@ -589,6 +659,7 @@ int receive_message(int sd, char *buffer, struct Client *clients, int server_pau
     return 0;
 }
 
+// Function to send the list of channels to a client
 void send_channel_list(int client_socket, Channel *channels, int num_channels) {
     char message[BUFFER_SIZE];
     char temp[BUFFER_SIZE];
@@ -613,6 +684,7 @@ void send_channel_list(int client_socket, Channel *channels, int num_channels) {
     send(client_socket, message, strlen(message), 0);
 }
 
+// Function to format lines for output
 char **format_lines(char **input_lines, int num_lines) {
     char **output_lines = (char **)malloc((num_lines + 3) * sizeof(char *));
 
@@ -630,13 +702,10 @@ char **format_lines(char **input_lines, int num_lines) {
         output_lines[i][0] = '\0';
     }
 
-    strcpy(output_lines[0], READ_START);
-    strcat(output_lines[0], "*");
-    sprintf(output_lines[0] + strlen(output_lines[0]), "%d", num_lines);
-    strcat(output_lines[0], "*");
+    sprintf(output_lines[0], "%s*%d*", READ_START, num_lines);
 
     int current_output_index = 1;
-    int current_output_length = strlen(READ_START) + strlen("*") + 2;
+    int current_output_length = strlen(output_lines[0]);
 
     for (int i = 0; i < num_lines; i++) {
         char *newline_position = strchr(input_lines[i], '\n');
@@ -662,14 +731,18 @@ char **format_lines(char **input_lines, int num_lines) {
 
         strcat(output_lines[current_output_index], DELIMITER_END);
         current_output_length += strlen(DELIMITER_END);
+        // printf("\n%s\n", output_lines[current_output_index]);
     }
 
-    strcpy(output_lines[num_lines + 1], READ_END);
+    // strcpy(output_lines[num_lines + 1], READ_END);
+
+    // printf("\n%s\n%s\n%s\n", output_lines[0], output_lines[1], output_lines[3]);
 
     return output_lines;
 }
 
-void send_last_channel_messages(int sd, char *channel_name) {
+// Function to send the last messages of a channel to a client
+void send_last_channel_messages(int sd, char *channel_name, int number_log_lines) {
     char log_filename[100];
     sprintf(log_filename, "../logs/%s.log", channel_name);
     FILE *log_file = fopen(log_filename, "r");
@@ -698,35 +771,42 @@ void send_last_channel_messages(int sd, char *channel_name) {
 
     rewind(log_file);
 
-    int num_lines_to_skip = (num_lines > MAX_LOG_LINES) ? num_lines - MAX_LOG_LINES : 0;
+    int num_lines_to_skip = (num_lines > number_log_lines) ? num_lines - number_log_lines : 0;
+    // printf("%d %d\n", num_lines_to_skip, num_lines);
 
     for (int i = 0; i < num_lines_to_skip; i++) {
         while ((ch = fgetc(log_file)) != '\n' && ch != EOF);
     }
 
-    char *lines[MAX_LOG_LINES];
-    for (int i = 0; i < MAX_LOG_LINES; i++) {
+    char *lines[number_log_lines];
+    for (int i = 0; i < number_log_lines; i++) {
         lines[i] = (char *)malloc(MAX_LOG_LINE_LENGTH);
+        // printf("%s", lines[i]);
+        // fflush(stdout);
         memset(lines[i], 0, MAX_LOG_LINE_LENGTH);
     }
 
     int count = 0;
+
     char buffer[MAX_LOG_LINE_LENGTH];
     while (fgets(buffer, sizeof(buffer), log_file) != NULL) {
-        strncpy(lines[count % MAX_LOG_LINES], buffer, MAX_LOG_LINE_LENGTH);
+        strncpy(lines[count], buffer, MAX_LOG_LINE_LENGTH);
         count++;
     }
 
     // Format the lines
-    char **formatted_lines = format_lines(lines, MAX_LOG_LINES);
+    char **formatted_lines = format_lines(lines, number_log_lines);
+    // printf("%s %s", formatted_lines[0], formatted_lines[1]);
 
-    for (int i = 0; i < MAX_LOG_LINES; ++i) {
+    // printf("\n%d\n", number_log_lines + 1);
+    for (int i = 0; i < number_log_lines + 1; ++i) {
         send(sd, formatted_lines[i], MAX_LOG_LINE_LENGTH, 0);
     }
 
     fclose(log_file);
 }
 
+// Function to check if a channel exists
 int channel_exists(Channel channels[], int num_channels, char *channel_name) {
     for (int i = 0; i < num_channels; i++) {
         if (strcmp(channels[i].channel, channel_name) == 0) {
@@ -736,6 +816,7 @@ int channel_exists(Channel channels[], int num_channels, char *channel_name) {
     return 0;
 }
 
+// Function to handle new client connections
 void handle_new_connection(int server_fd, struct sockaddr_in *address, int *addrlen, struct Client *clients) {
     int new_socket;
     if ((new_socket = accept(server_fd, (struct sockaddr *)address, (socklen_t *)addrlen)) == -1) {
@@ -756,6 +837,7 @@ void handle_new_connection(int server_fd, struct sockaddr_in *address, int *addr
     printf("New connection, ip %s, port %d\n", inet_ntoa(address->sin_addr), ntohs(address->sin_port));
 }
 
+// Function to read channels from a file
 void read_channels_from_file(Channel *channels, int *num_channels) {
     FILE *file = fopen("channels.txt", "r");
 
@@ -785,6 +867,7 @@ void read_channels_from_file(Channel *channels, int *num_channels) {
     fclose(file);
 }
 
+// Function to add a new channel
 void add_channel(Channel *channels, char *channel_name, char *comment, int *num_channels) {
     if (*num_channels >= MAX_CHANNELS) {
         printf("Maximum number of channels reached\n");
@@ -797,6 +880,7 @@ void add_channel(Channel *channels, char *channel_name, char *comment, int *num_
 
     (*num_channels)++;
 
+    // Create log file for the new channel
     char log_filename[100];
     sprintf(log_filename, "../logs/%s.log", channel_name);
     FILE *log_file = fopen(log_filename, "w");
@@ -808,6 +892,7 @@ void add_channel(Channel *channels, char *channel_name, char *comment, int *num_
 
     fclose(log_file);
 
+    // Append the new channel to the channels file
     FILE *file = fopen("channels.txt", "a");
     if (file == NULL) {
         perror("Error opening file");
@@ -820,6 +905,7 @@ void add_channel(Channel *channels, char *channel_name, char *comment, int *num_
     printf("Channel '%s' added successfully with comment: '%s'\n", channel_name, comment);
 }
 
+// Function to print the list of channels
 void print_channels(Channel *channels, int num_channels) {
     printf("Total number of channels: %d\n", num_channels);
     printf("Channels:\n");
@@ -829,6 +915,7 @@ void print_channels(Channel *channels, int num_channels) {
     }
 }
 
+// Function to add a client to a channel
 void add_client_to_channel(Channel channels[], int num_channels, Client *client, char *channel_name) {
     for (int i = 0; i < num_channels; i++) {
         if (strcmp(channels[i].channel, channel_name) == 0) {
@@ -843,6 +930,7 @@ void add_client_to_channel(Channel channels[], int num_channels, Client *client,
     }
 }
 
+// Function to get the channel a client is connected to
 char *get_client_channel(int socket, struct Client *clients) {
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (clients[i].socket == socket) {
@@ -852,6 +940,7 @@ char *get_client_channel(int socket, struct Client *clients) {
     return "Unknown";
 }
 
+// Function to encode a string using SHA1
 void sha1_encode(const char *input_string, unsigned char *hash) {
     SHA1((unsigned char *)input_string, strlen(input_string), hash);
 }
@@ -869,23 +958,27 @@ int main(int argc, char *argv[]) {
     int num_channels = 0;
     Channel channels[MAX_CHANNELS];
 
+    // Read channels from file
     read_channels_from_file(channels, &num_channels);
     print_channels(channels, num_channels);
 
     int port;
 
+    // Parse command line arguments
     parse_arguments(argc, argv, &port);
 
+    // Set up the server
     setup_server(&server_fd, port, clients, &address);
 
     while (server_running) {
-        // cleaning fd set
+        // Clean the fd set
         FD_ZERO(&readfds);
         FD_SET(server_fd, &readfds);
         FD_SET(STDIN_FILENO, &readfds);
 
         int max_sd = (server_fd > STDIN_FILENO) ? server_fd : STDIN_FILENO;
 
+        // Add client sockets to set
         for (int i = 0; i < MAX_CLIENTS; i++) {
             if (clients[i].socket != 0) {
                 FD_SET(clients[i].socket, &readfds);
@@ -895,24 +988,25 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        // waiting for activity on any of client sockets
+        // Wait for activity on any of the sockets
         if (select(max_sd + 1, &readfds, NULL, NULL, NULL) < 0) {
             perror("select");
             exit(EXIT_FAILURE);
         }
 
-        // new connection
+        // New connection
         if (!server_paused && FD_ISSET(server_fd, &readfds)) {
             handle_new_connection(server_fd, &address, &addrlen, clients);
         }
 
-        // stdin input
+        // Check for stdin input
         if (FD_ISSET(STDIN_FILENO, &readfds)) {
             char cmd[COMMAND_LEN];
 
             if (fgets(cmd, sizeof(cmd), stdin) != NULL) {
                 cmd[strcspn(cmd, "\n")] = 0;
 
+                // Process command from stdin
                 if (process_command(cmd, server_fd, clients, &address, &port, &server_paused, channels,
                                     &num_channels)) {
                     continue;
@@ -920,7 +1014,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        // check for IO operation on existing client sockets
+        // Check for IO operation on existing client sockets
         for (int i = 0; i < MAX_CLIENTS; i++) {
             int sd = clients[i].socket;
 

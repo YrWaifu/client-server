@@ -18,7 +18,7 @@
 #define MAX_CHANNEL_NAME_LENGTH 30
 #define NICKNAME_SIZE 32
 
-void print_help(char *argv[]);
+void print_help();
 void parse_arguments(int argc, char *argv[], int *port, char **ip);
 int connect_to_server(char *ip, int port);
 int process_command(char *buffer, int sock, char *ip, int port, int *connected_to_channel,
