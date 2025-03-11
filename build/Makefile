@@ -1,6 +1,6 @@
 CC=gcc
 CFLAGS=
-LDFLAGS=-lcrypto -lssl
+LDFLAGS=-lcrypto -lssl -lpthread -lasound
 
 all: client server
 

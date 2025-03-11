@@ -1,8 +1,10 @@
+#include <alsa/asoundlib.h>
 #include <arpa/inet.h>
 #include <bits/getopt_core.h>
 #include <getopt.h>
 #include <netinet/in.h>
 #include <openssl/sha.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,6 +22,7 @@
 #define MAX_COMMENT_LENGTH 1024
 #define MAX_CHANNEL_CLIENTS 15
 #define COMMAND_LEN 1024
+#define SOUND_BUFFER_SIZE 4096
 
 #define SO_REUSEPORT 15
 
@@ -30,6 +33,10 @@ struct Channel;
 
 typedef struct Client {
     int socket;
+    int sound_on;
+    int sending_audio;
+    int audio_socket;
+    char audio_buffer[BUFFER_SIZE];
     char nickname[NICKNAME_SIZE];
     char channel[MAX_CHANNEL_NAME_LENGTH];
     int connected_to_channel;
@@ -42,12 +49,37 @@ typedef struct Channel {
     int num_clients;
 } Channel;
 
+struct ServerContext {
+    int server_running;
+    Client *clients;
+};
+
+typedef struct ThreadData {
+    struct Client *clients;  // Указатель на массив клиентов
+    int server_paused;
+    char sound_buffer[SOUND_BUFFER_SIZE];
+    char last_buffer[BUFFER_SIZE];
+} ThreadData;
+
+#define MAX_AUDIO_CLIENTS 10  // Максимальное количество клиентов, передающих звук
+
+typedef struct {
+    int socket;
+    int sound_on;
+    int recording;
+} AudioClient;
+
+AudioClient audio_clients[MAX_AUDIO_CLIENTS];
+
+void *audio_mixing_thread(void *arg);
 void print_help();
 void parse_arguments(int argc, char *argv[], int *port);
-void setup_server(int *server_fd, int port, struct Client *clients, struct sockaddr_in *address);
+void setup_server(int *server_fd, int *audio_server_fd, int port, struct Client *clients,
+                  struct sockaddr_in *address);
 char *get_client_nickname(int socket, struct Client *clients);
-int process_command(char *cmd, int server_fd, struct Client *clients, struct sockaddr_in *address, int *port,
-                    int *server_paused, Channel *channels, int *num_channels);
+int process_command(char *cmd, int server_fd, int audio_server_fd, struct Client *clients,
+                    struct sockaddr_in *address, int *port, int *server_paused, Channel *channels,
+                    int *num_channels);
 int receive_message(int sd, char *buffer, struct Client *clients, int server_paused, Channel *channels,
                     int num_channels);
 void handle_new_connection(int server_fd, struct sockaddr_in *address, int *addrlen, struct Client *clients);
@@ -61,10 +93,12 @@ char *get_client_channel(int socket, struct Client *clients);
 void add_client_to_channel(Channel channels[], int num_channels, Client *client, char *channel_name);
 void log_message(char *channel_name, char *client_channel, char *client_nickname,
                  struct sockaddr_in client_address, char *buffer);
-void del_channel(Channel *channels, int *num_channels, char *channel_name);
+void del_channel(Channel *channels, int *num_channels, char *channel_name, struct Client *clients);
 void set_channel(Channel *channels, int num_channels, char *channel_name, char *new_comment);
 void send_last_channel_messages(int sd, char *channel_name, int num_lines);
 void send_channel_list(int client_socket, Channel *channels, int num_channels);
+void print_server_info(int server_paused, time_t server_start_time, struct Client *clients, Channel *channels,
+                       int num_channels);
 
 void sha1_encode(const char *input_string, unsigned char *hash);
 

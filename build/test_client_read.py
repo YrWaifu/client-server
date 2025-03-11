@@ -1,5 +1,20 @@
 import subprocess
 import time
+import hashlib
+
+def sha1_encode(input_string: str) -> bytes:
+    hasher = hashlib.sha1()
+    hasher.update(input_string.encode('utf-8'))
+    return hasher.digest()
+
+# '[05.07.2024', '15:47:02]', 'Olga', '(127.0.0.1:58850):', 'hello']
+# to hello05.07.2024 15:47:02Olga
+def format_message(input_string):
+    split_string = input_string.split()
+    result_string = f"{split_string[4]}{split_string[0][1:]} {split_string[1][:-1]}{split_string[2]}"
+    # print(sha1_encode(result_string), "    ", split_string[6][:-1])
+    # print(sha1_encode(result_string).hex() == split_string[6][:-1])
+    return sha1_encode(result_string).hex()
 
 found_messages = 0
 
@@ -9,7 +24,7 @@ def read_file(file_path):
     return [line.strip() for line in lines]
 
 def run_client(ip, port, username, channel, messages):
-    command = ['./client', '--ip-address', ip, '--port', port]
+    command = ['./client', '--ip-address', ip, '--port', port, '-d']
     global found_messages
     
     try:
@@ -26,7 +41,7 @@ def run_client(ip, port, username, channel, messages):
 
             # Подключаемся и логинимся
             send_input("2\n")  # Выбираем логин
-            send_input("1\n")  # Вводим всегда "1"
+            send_input("1\n")  # Вводим логин
             send_input("1\n")  # Вводим пароль
             
             # Ожидание завершения входа
@@ -53,13 +68,13 @@ def run_client(ip, port, username, channel, messages):
                 for response in responses:
                     print(f"Ответ: {response}")
 
-                    if "TEST STARTED" in response:
+                    if "TEST STARTED" in response and not test_started:
                         test_started = True
                         print("Тест начался")
 
                     if test_started:
-                        if message_index < len(messages) and messages[message_index] in response and username in response:
-                            print(f"Найдено сообщение: {messages[message_index]}")
+                        if message_index < len(messages) and messages[message_index] in response and username in response and (format_message(response) ==  response.split()[6][:-1]):
+                            print(f"-------Найдено сообщение: {messages[message_index]}-------")
                             found_messages += 1
                             message_index += 1
 

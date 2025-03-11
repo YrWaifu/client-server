@@ -1,5 +1,7 @@
 #include "../include/server.h"
 
+time_t server_start_time;
+
 // Function to print the help message
 void print_help() {
     printf("Usage: ./server -p {port}\n");
@@ -32,6 +34,10 @@ void parse_arguments(int argc, char *argv[], int *port) {
         switch (opt) {
             case 'p':
                 *port = atoi(optarg);  // Set port from argument
+                if (*port < 1024 || *port > 65535) {
+                    printf("Port must be between 1024 and 65535\n");
+                    exit(EXIT_FAILURE);
+                }
                 break;
             case 'h':
                 print_help();  // Print help message
@@ -49,7 +55,8 @@ void parse_arguments(int argc, char *argv[], int *port) {
 }
 
 // Function to set up the server
-void setup_server(int *server_fd, int port, Client *clients, struct sockaddr_in *address) {
+void setup_server(int *server_fd, int *audio_server_fd, int port, Client *clients,
+                  struct sockaddr_in *address) {
     // Create socket
     if ((*server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
         perror("socket failed");
@@ -72,6 +79,25 @@ void setup_server(int *server_fd, int port, Client *clients, struct sockaddr_in 
         exit(EXIT_FAILURE);
     }
 
+    int audio_port = (port + 1) > 65535 ? port - 1 : port + 1;  // Audio socket will use the next port
+    if ((*audio_server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+        perror("audio socket failed");
+        exit(EXIT_FAILURE);
+    }
+
+    address->sin_port = htons(audio_port);  // Set the port for the audio socket
+
+    if (bind(*audio_server_fd, (struct sockaddr *)address, sizeof(*address)) < 0) {
+        perror("audio bind failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Listen for incoming audio connections
+    if (listen(*audio_server_fd, MAX_CLIENTS) < 0) {
+        perror("audio listen");
+        exit(EXIT_FAILURE);
+    }
+
     // Initialize client sockets to 0 (not connected)
     for (int i = 0; i < MAX_CLIENTS; i++) {
         clients[i].socket = 0;
@@ -79,6 +105,7 @@ void setup_server(int *server_fd, int port, Client *clients, struct sockaddr_in 
     }
 
     printf("Server listening on port %d\n", port);
+    printf("Server listening on port %d for audio\n", audio_port);
 }
 
 // Function to get the nickname of a client by their socket
@@ -92,8 +119,9 @@ char *get_client_nickname(int socket, struct Client *clients) {
 }
 
 // Function to process commands from stdin
-int process_command(char *cmd, int server_fd, struct Client *clients, struct sockaddr_in *address, int *port,
-                    int *server_paused, Channel *channels, int *num_channels) {
+int process_command(char *cmd, int server_fd, int audio_server_fd, struct Client *clients,
+                    struct sockaddr_in *address, int *port, int *server_paused, Channel *channels,
+                    int *num_channels) {
     // Command "stop" or "exit"
     if (strcmp(cmd, "/stop") == 0 || strcmp(cmd, "/exit") == 0) {
         printf("Stopping the server...\n");
@@ -176,46 +204,76 @@ int process_command(char *cmd, int server_fd, struct Client *clients, struct soc
         // Command "add_channel"
     } else if (strncmp(cmd, "/add_channel ", 13) == 0) {
         char *channel_start = cmd + 13;
-
         char *channel_end = strchr(channel_start, ' ');
+        if (channel_end == NULL) {
+            channel_end = cmd + strlen(cmd);
+        }
+
         if (channel_end == NULL) {
             printf("Invalid command format: channel name is missing\n");
             return 1;
         }
 
-        char *comment_start = strchr(channel_end, '\"');
-        if (comment_start == NULL) {
-            printf("Invalid command format: comment is missing\n");
-            return 1;
-        }
-
-        char *comment_end = strchr(comment_start + 1, '\"');
-        if (comment_end == NULL) {
-            printf("Invalid command format: closing quote for comment is missing\n");
-            return 1;
-        }
-
-        char channel_name[MAX_CHANNEL_NAME_LENGTH];
+        // Checking the length of the name
         int channel_name_length = channel_end - channel_start;
-        if (channel_name_length >= MAX_CHANNEL_NAME_LENGTH) {
-            printf("Channel name is too long\n");
+        if (channel_name_length < 3 || channel_name_length > 24) {
+            printf("Channel name must be between 3 and 24 characters long\n");
             return 1;
         }
+
+        // Checking on valid characters
+        for (int i = 0; i < channel_name_length; i++) {
+            if (!((channel_start[i] >= 'A' && channel_start[i] <= 'Z') ||
+                  (channel_start[i] >= 'a' && channel_start[i] <= 'z') ||
+                  (channel_start[i] >= '0' && channel_start[i] <= '9') || channel_start[i] == '_' ||
+                  channel_start[i] == '-')) {
+                printf("Invalid character in channel name\n");
+                return 1;
+            }
+        }
+
+        // Checking the name is starting ftom letter
+        if (!((channel_start[0] >= 'A' && channel_start[0] <= 'Z') ||
+              (channel_start[0] >= 'a' && channel_start[0] <= 'z'))) {
+            printf("Channel name must start with a letter\n");
+            return 1;
+        }
+
+        // Checking name already exists
+        if (channel_exists(channels, *num_channels, channel_start)) {
+            printf("Channel with this name already exists\n");
+            return 1;
+        }
+
+        // Копирование имени канала
+        char channel_name[MAX_CHANNEL_NAME_LENGTH];
         strncpy(channel_name, channel_start, channel_name_length);
         channel_name[channel_name_length] = '\0';
 
-        char comment[MAX_COMMENT_LENGTH];
-        int comment_length = comment_end - comment_start - 1;
-        if (comment_length >= MAX_COMMENT_LENGTH) {
-            printf("Comment is too long\n");
-            return 1;
+        // Поиск комментария
+        char *comment_start = strchr(channel_end + 1, '\"');
+        char comment[MAX_COMMENT_LENGTH] = "";
+        if (comment_start != NULL) {
+            char *comment_end = strchr(comment_start + 1, '\"');
+            if (comment_end == NULL) {
+                printf("Invalid command format: closing quote for comment is missing\n");
+                return 1;
+            }
+
+            int comment_length = comment_end - comment_start - 1;
+            if (comment_length < 4 || comment_length > 256) {
+                printf("Comment must be between 4 and 256 characters long\n");
+                return 1;
+            }
+
+            strncpy(comment, comment_start + 1, comment_length);
+            comment[comment_length] = '\0';
         }
-        strncpy(comment, comment_start + 1, comment_length);
-        comment[comment_length] = '\0';
 
         add_channel(channels, channel_name, comment, num_channels);
 
         return 1;
+
         // Command "del_channel"
     } else if (strncmp(cmd, "/del_channel ", 13) == 0) {
         char channel_name[MAX_CHANNEL_NAME_LENGTH];
@@ -226,7 +284,7 @@ int process_command(char *cmd, int server_fd, struct Client *clients, struct soc
             *pos = '\0';
         }
 
-        del_channel(channels, num_channels, channel_name);
+        del_channel(channels, num_channels, channel_name, clients);
 
         return 1;
         // Command "set_channel"
@@ -277,8 +335,13 @@ int process_command(char *cmd, int server_fd, struct Client *clients, struct soc
         print_help();
         return 1;
         // Command "channels"
-    } else if ((strcmp(cmd, "/channels") == 0) || (strcmp(cmd, "/info") == 0)) {
+    } else if ((strcmp(cmd, "/channels") == 0)) {
         print_channels(channels, *num_channels);
+        return 1;
+        // Command "info"
+    } else if (strcmp(cmd, "/info") == 0) {
+        print_server_info(*server_paused, server_start_time, clients, channels, *num_channels);
+
         return 1;
     } else {
         printf("Wrong command\n");
@@ -286,6 +349,47 @@ int process_command(char *cmd, int server_fd, struct Client *clients, struct soc
         return 1;
     }
     return 0;
+}
+
+void print_server_info(int server_paused, time_t server_start_time, struct Client *clients, Channel *channels,
+                       int num_channels) {
+    printf("Server status: %s\n", server_paused ? "Paused" : "Active");
+
+    time_t current_time;
+    time(&current_time);
+    double uptime = difftime(current_time, server_start_time);
+
+    int hours = (int)(uptime / 3600);
+    int minutes = (int)((uptime - hours * 3600) / 60);
+    int seconds = (int)(uptime - hours * 3600 - minutes * 60);
+
+    printf("Server uptime: %02d:%02d:%02d\n", hours, minutes, seconds);
+
+    int num_clients = 0;
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (clients[i].socket != 0) {
+            num_clients++;
+        }
+    }
+
+    printf("Connected clients: %d\n", num_clients);
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (clients[i].socket != 0) {
+            struct sockaddr_in client_address;
+            socklen_t addr_len = sizeof(client_address);
+            getpeername(clients[i].socket, (struct sockaddr *)&client_address, &addr_len);
+
+            printf("  - %s:%d\n", inet_ntoa(client_address.sin_addr), ntohs(client_address.sin_port));
+        }
+    }
+
+    // 4. Информация по существующим каналам
+    printf("Total number of channels: %d\n", num_channels);
+    printf("Channels:\n");
+    for (int i = 0; i < num_channels; i++) {
+        printf("  %d. Name: %s, Comment: %s, Num of clients: %d\n", i + 1, channels[i].channel,
+               channels[i].comment, channels[i].num_clients);
+    }
 }
 
 // Function to set a new comment for an existing channel
@@ -321,10 +425,11 @@ void set_channel(Channel *channels, int num_channels, char *channel_name, char *
 }
 
 // Function to delete a channel
-void del_channel(Channel *channels, int *num_channels, char *channel_name) {
+void del_channel(Channel *channels, int *num_channels, char *channel_name, struct Client *clients) {
     int found = 0;
     int index = -1;
 
+    // Поиск канала
     for (int i = 0; i < *num_channels; i++) {
         if (strcmp(channels[i].channel, channel_name) == 0) {
             found = 1;
@@ -333,38 +438,56 @@ void del_channel(Channel *channels, int *num_channels, char *channel_name) {
         }
     }
 
-    if (found) {
-        // Shift the channels array to remove the deleted channel
-        for (int i = index; i < *num_channels - 1; i++) {
-            strcpy(channels[i].channel, channels[i + 1].channel);
-            strcpy(channels[i].comment, channels[i + 1].comment);
-            channels[i].num_clients = channels[i + 1].num_clients;
-        }
-
-        (*num_channels)--;
-
-        // Update the channels file
-        FILE *file = fopen("channels.txt", "w");
-        if (file == NULL) {
-            perror("Error opening file");
-            exit(EXIT_FAILURE);
-        }
-
-        for (int i = 0; i < *num_channels; i++) {
-            fprintf(file, "%s %s\n", channels[i].channel, channels[i].comment);
-        }
-
-        fclose(file);
-
-        // Remove the channel log file
-        char buffer[MAX_CHANNEL_NAME_LENGTH + 11];
-        sprintf(buffer, "../logs/%s.log", channel_name);
-        remove(buffer);
-
-        printf("Channel '%s' successfully deleted\n", channel_name);
-    } else {
+    if (!found) {
         printf("Channel '%s' not found\n", channel_name);
+        return;
     }
+
+    // Закрытие всех активных соединений и сессий, связанных с каналом
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (strcmp(clients[i].channel, channel_name) == 0) {
+            // Уведомление клиентов о удалении канала
+            send(clients[i].socket, "The channel you were connected to has been deleted.",
+                 strlen("The channel you were connected to has been deleted."), 0);
+
+            // Закрытие клиентских соединений
+            close(clients[i].socket);
+            clients[i].socket = 0;
+            strcpy(clients[i].channel, "Unknown");
+
+            // Остановка аудиопотоков и освобождение ресурсов
+            if (clients[i].audio_socket != 0) {
+                close(clients[i].audio_socket);
+                clients[i].audio_socket = 0;
+                clients[i].sound_on = 0;
+            }
+        }
+    }
+
+    // Удаление канала из общего списка доступных каналов
+    for (int i = index; i < *num_channels - 1; i++) {
+        channels[i] = channels[i + 1];
+    }
+    (*num_channels)--;
+
+    // Обновление файла каналов
+    FILE *file = fopen("channels.txt", "w");
+    if (file == NULL) {
+        perror("Error opening channels file");
+        exit(EXIT_FAILURE);
+    }
+
+    for (int i = 0; i < *num_channels; i++) {
+        fprintf(file, "%s %s\n", channels[i].channel, channels[i].comment);
+    }
+
+    char buffer[MAX_CHANNEL_NAME_LENGTH + 11];
+    sprintf(buffer, "../logs/%s.log", channel_name);
+    remove(buffer);
+
+    fclose(file);
+
+    printf("Channel '%s' successfully deleted\n", channel_name);
 }
 
 // Function to print information about a channel
@@ -521,6 +644,8 @@ int receive_message(int sd, char *buffer, struct Client *clients, int server_pau
                         break;
                     }
                 }
+
+                return 1;
             } else if ((strncmp(buffer, "/read ", 6) == 0) || (strcmp(buffer, "/read\n") == 0)) {
                 // Handle read command
                 int num_lines = atoi(buffer + 6);
@@ -629,6 +754,19 @@ int receive_message(int sd, char *buffer, struct Client *clients, int server_pau
 
                 return 1;
             } else {
+                int check = 0;
+
+                for (int i = 0; i < MAX_CLIENTS; i++) {
+                    if (clients[i].socket == sd) {
+                        if (clients[i].sending_audio == 1) {
+                            check = 1;
+                        }
+                    }
+                }
+                if (check) {
+                    return 1;
+                }
+
                 // Echo received message back to client
                 getpeername(sd, (struct sockaddr *)&client_address, (socklen_t *)&client_addrlen);
 
@@ -837,6 +975,29 @@ void handle_new_connection(int server_fd, struct sockaddr_in *address, int *addr
     printf("New connection, ip %s, port %d\n", inet_ntoa(address->sin_addr), ntohs(address->sin_port));
 }
 
+void handle_audio_connection(int audio_server_fd, struct sockaddr_in *address, int *addrlen,
+                             struct Client clients[]) {
+    int new_socket;
+    if ((new_socket = accept(audio_server_fd, (struct sockaddr *)address, (socklen_t *)addrlen)) < 0) {
+        perror("accept");
+        exit(EXIT_FAILURE);
+    }
+
+    // Найдите свободное место в массиве клиентов для нового подключения
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (clients[i].audio_socket == 0) {
+            clients[i].audio_socket = new_socket;
+            printf("New audio connection, ip %s, port %d\n", inet_ntoa(address->sin_addr),
+                   ntohs(address->sin_port));
+            return;
+        }
+    }
+
+    // Если нет свободного места, закройте соединение
+    printf("No space for new audio client\n");
+    close(new_socket);
+}
+
 // Function to read channels from a file
 void read_channels_from_file(Channel *channels, int *num_channels) {
     FILE *file = fopen("channels.txt", "r");
@@ -946,10 +1107,11 @@ void sha1_encode(const char *input_string, unsigned char *hash) {
 }
 
 int main(int argc, char *argv[]) {
-    int server_fd, new_socket, valread;
+    int server_fd, audio_server_fd;
     struct sockaddr_in address;
     int addrlen = sizeof(address);
     char buffer[BUFFER_SIZE] = {0};
+    char sound_buffer[SOUND_BUFFER_SIZE] = {0};
     fd_set readfds;
     int server_running = 1;
     int server_paused = 0;
@@ -958,25 +1120,29 @@ int main(int argc, char *argv[]) {
     int num_channels = 0;
     Channel channels[MAX_CHANNELS];
 
-    // Read channels from file
-    read_channels_from_file(channels, &num_channels);
-    print_channels(channels, num_channels);
+    time(&server_start_time);
 
     int port;
 
     // Parse command line arguments
     parse_arguments(argc, argv, &port);
 
+    // Read channels from file
+    read_channels_from_file(channels, &num_channels);
+    print_channels(channels, num_channels);
+
     // Set up the server
-    setup_server(&server_fd, port, clients, &address);
+    setup_server(&server_fd, &audio_server_fd, port, clients, &address);
 
     while (server_running) {
         // Clean the fd set
         FD_ZERO(&readfds);
         FD_SET(server_fd, &readfds);
+        FD_SET(audio_server_fd, &readfds);
         FD_SET(STDIN_FILENO, &readfds);
 
-        int max_sd = (server_fd > STDIN_FILENO) ? server_fd : STDIN_FILENO;
+        int max_sd = (server_fd > audio_server_fd) ? server_fd : audio_server_fd;
+        max_sd = (max_sd > STDIN_FILENO) ? max_sd : STDIN_FILENO;
 
         // Add client sockets to set
         for (int i = 0; i < MAX_CLIENTS; i++) {
@@ -984,6 +1150,12 @@ int main(int argc, char *argv[]) {
                 FD_SET(clients[i].socket, &readfds);
                 if (clients[i].socket > max_sd) {
                     max_sd = clients[i].socket;
+                }
+            }
+            if (clients[i].audio_socket != 0) {
+                FD_SET(clients[i].audio_socket, &readfds);
+                if (clients[i].audio_socket > max_sd) {
+                    max_sd = clients[i].audio_socket;
                 }
             }
         }
@@ -994,9 +1166,14 @@ int main(int argc, char *argv[]) {
             exit(EXIT_FAILURE);
         }
 
-        // New connection
+        // New connection on the main server socket
         if (!server_paused && FD_ISSET(server_fd, &readfds)) {
             handle_new_connection(server_fd, &address, &addrlen, clients);
+        }
+
+        // New connection on the audio server socket
+        if (!server_paused && FD_ISSET(audio_server_fd, &readfds)) {
+            handle_audio_connection(audio_server_fd, &address, &addrlen, clients);
         }
 
         // Check for stdin input
@@ -1007,8 +1184,8 @@ int main(int argc, char *argv[]) {
                 cmd[strcspn(cmd, "\n")] = 0;
 
                 // Process command from stdin
-                if (process_command(cmd, server_fd, clients, &address, &port, &server_paused, channels,
-                                    &num_channels)) {
+                if (process_command(cmd, server_fd, audio_server_fd, clients, &address, &port, &server_paused,
+                                    channels, &num_channels)) {
                     continue;
                 }
             }
@@ -1022,6 +1199,78 @@ int main(int argc, char *argv[]) {
                 // Call receive_message function
                 if (receive_message(sd, buffer, clients, server_paused, channels, num_channels)) {
                     continue;
+                }
+            }
+        }
+
+        char last_buffer[SOUND_BUFFER_SIZE] = {0};
+
+        // Check for IO operation on audio client sockets
+        for (int i = 0; i < MAX_CLIENTS; i++) {
+            int sd = clients[i].audio_socket;
+
+            if (sd > 0 && FD_ISSET(sd, &readfds)) {
+                int bytes_received = recv(sd, sound_buffer, sizeof(sound_buffer), 0);
+                // printf("g");
+                // fflush(stdout);
+                // printf("%s\n", sound_buffer);
+                if (strncmp(sound_buffer, "/sound_on", 10) == 0) {
+                    // printf("%s\n", sound_buffer);
+                    for (int i = 0; i < MAX_CLIENTS; ++i) {
+                        if (clients[i].audio_socket == sd) {
+                            clients[i].sound_on = 1;
+                            break;
+                        }
+                    }
+                }
+
+                if (strncmp(sound_buffer, "/sound_off", 11) == 0) {
+                    // printf("GOT\n");
+                    for (int i = 0; i < MAX_CLIENTS; ++i) {
+                        if (clients[i].audio_socket == sd) {
+                            clients[i].sound_on = 0;
+                            break;
+                        }
+                    }
+                }
+
+                if (bytes_received > 0 && sound_buffer[0] != '/') {
+                    memcpy(last_buffer, sound_buffer, bytes_received);
+                }
+
+                char client_channel[MAX_CHANNEL_NAME_LENGTH];
+                for (int i = 0; i < MAX_CLIENTS; i++) {
+                    if (clients[i].audio_socket == sd) {
+                        strcpy(client_channel, clients[i].channel);
+                        // printf("%s\n", client_channel);
+                    }
+                }
+
+                for (int i = 0; i < MAX_CLIENTS; i++) {
+                    // printf("%d %d %d\n", clients[i].audio_socket, sd, clients[i].sound_on);
+                    if (clients[i].audio_socket != sd && clients[i].sound_on &&
+                        strcmp(client_channel, clients[i].channel) == 0) {
+                        // printf("%d\t", clients[i].sound_on);
+                        // fflush(stdout);
+                        if (bytes_received > 0) {
+                            // printf("%s", sound_buffer);
+                            send(clients[i].audio_socket, sound_buffer, SOUND_BUFFER_SIZE, 0);
+                        } else {
+                            // Отправляем последний ненулевой буфер или тишину
+                            if (last_buffer[0] != 0) {
+                                send(clients[i].audio_socket, last_buffer, SOUND_BUFFER_SIZE, 0);
+                            } else {
+                                char silent_buffer[SOUND_BUFFER_SIZE] = {0};
+                                send(clients[i].audio_socket, silent_buffer, SOUND_BUFFER_SIZE, 0);
+                            }
+                        }
+                    }
+                }
+
+                if (bytes_received == 0) {
+                    // Client disconnected
+                    close(sd);
+                    clients[i].audio_socket = 0;  // Mark as not connected
                 }
             }
         }
